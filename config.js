@@ -6,6 +6,7 @@ var path = require('path'),
 
 config = {
     // ### Development **(default)**
+    // Force new line
     development: {
         // The url to use when providing links to the site, E.g. in RSS and email.
         url: 'http://127.0.0.1',
