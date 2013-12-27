@@ -193,7 +193,7 @@
             this.renderItem(item);
         },
         clearEverything: function () {
-            this.$el.find('.js-notification.notification-passive').remove();
+            this.$el.find('.js-notification.notification-passive').parent().remove();
         },
         removeItem: function (e) {
             e.preventDefault();
@@ -205,8 +205,9 @@
                     headers: {
                         'X-CSRF-Token': $("meta[name='csrf-param']").attr('content')
                     },
-                    url: '/api/v0.1/notifications/' + $(self).find('.close').data('id')
+                    url: Ghost.paths.apiRoot + '/notifications/' + $(self).find('.close').data('id')
                 }).done(function (result) {
+                    /*jslint unparam:true*/
                     bbSelf.$el.slideUp(250, function () {
                         $(this).show().css({height: "auto"});
                         $(self).remove();
@@ -217,6 +218,7 @@
                     $(this)
                         .show()
                         .css({height: "auto"})
+                        .parent()
                         .remove();
                 });
             }
@@ -237,8 +239,9 @@
                 headers: {
                     'X-CSRF-Token': $("meta[name='csrf-param']").attr('content')
                 },
-                url: '/api/v0.1/notifications/' + $(self).data('id')
+                url: Ghost.paths.apiRoot + '/notifications/' + $(self).data('id')
             }).done(function (result) {
+                /*jslint unparam:true*/
                 var height = bbSelf.$('.js-notification').outerHeight(true),
                     $parent = $(self).parent();
                 bbSelf.$el.css({height: height});

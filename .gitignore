@@ -1,5 +1,5 @@
 # Project Environment
-node_modules/
+content/themes/girder-ghost-dev/node_modules/
 bower_components/
 build/
 _site/

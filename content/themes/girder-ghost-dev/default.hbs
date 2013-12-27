@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<meta http-equiv="Content-Type" content="text/html" charset="UTF-8" />
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
 
 	<title>{{meta_title}}</title>
@@ -14,38 +14,32 @@
 	<meta name="twitter:card" content="summary">
 	<meta name="twitter:title" content="{{meta_title}}">
 	<meta name="twitter:description" content="{{meta_description}}">
-	{{! Twitter username for the site owner and content author }}
-	<meta name="twitter:site" content="@yourblogtwitter">
-	<meta name="twitter:creator" content="@yourtwitter">
+	<meta name="twitter:creator" content="@unmaya">
 
 	<meta property="og:type" content="article">
 	<meta property="og:title" content="{{meta_title}}">
 	<meta property="og:description" content="{{meta_description}}">
 
-	<script src="//use.edgefonts.net/source-sans-pro;pt-sans-narrow;lato:n1,n3,n9,i9.js"></script>
-
-	<link rel="stylesheet" type="text/css" href="/assets/css/site.css" />
+		<script src="//use.edgefonts.net/source-sans-pro;pt-sans-narrow;lato:n1,n3,n9,i9.js"></script>
+		<link rel="stylesheet" type="text/css" href="/assets/css/site.css" />
 
 	<!--[if lt IE 9]>
 		<script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
 	<![endif]-->
 
-	<link href="/favicon.ico" rel="shortcut icon" type="image/x-icon">
-	<link href="/apple-touch-icon-precomposed.png" rel="apple-touch-icon">
-
-	{{ghost_head}}
+    {{! Ghost outputs important style and meta data with this tag }}
+    {{ghost_head}}
 </head>
-
 <body class="{{body_class}}">
 
 <header id="site-head"{{#if @blog.cover}} class="cover"{{/if}}>
 	<div class="inner">
 		{{#if @blog.logo}}
 			<a class="js-ajax-link js-show-index" id="blog-logo" href="{{@blog.url}}"><img src="{{@blog.logo}}" alt="Blog Logo" /></a>
-			<h1 class="blog-title"><a class="js-ajax-link js-show-index" id="blog-logo-title" href="{{@blog.url}}">{{@blog.title}}</a></h1>
 		{{else}}
-			<h1 class="blog-title"><a class="js-ajax-link js-show-index" id="blog-title" href="{{@blog.url}}">{{@blog.title}}</a></h1>
+			<a class="js-ajax-link js-show-index" id="blog-logo" href="{{@blog.url}}"><img src="/assets/img/girder-logo-white.png" alt="Girder Ghost Logo" /></a>
 		{{/if}}
+			<h1 class="blog-title"><a class="js-ajax-link js-show-index" id="blog-logo-title" href="{{@blog.url}}">{{@blog.title}}</a></h1>
 	</div>
 	{{#if @blog.cover}}
 		<div id="site-cover" style="background-image: url({{@blog.cover}})"></div>
@@ -61,10 +55,10 @@
 </section>
 
 <footer class="site-footer">
-	<a class="thetheme" href="#"><small>Ghost Theme</small></a>
+	<a class="thetheme" href="https://github.com/unmaya/ghost-play"><small>Ghost Theme</small></a>
 	<div class="inner">
 		<section class="copyright">All content by <a href="/">{{@blog.title}}</a> &copy; 2013 &bull; All rights reserved.</section>
-		<section class="poweredby"><small>Published with <a class="icon-ghost" href="http://ghost.org">Ghost</a></small></section>
+		<section class="poweredby"><small>Published with <a class="icon-ghost" href="http://ghost.org">Ghost</a> - Theme by <a href="http://comfypixel.com">Comfy Pixel</a>.</small></section>
 	</div>
 </footer>
 
@@ -79,14 +73,15 @@
 <!-- endbuild -->
 
 <script type="text/javascript">
-{{> analytics_config}}
-
-(function(g,h,o,s,t,z){g.GoogleAnalyticsObject=s;g[s]||(g[s]=
-function(){(g[s].q=g[s].q||[]).push(arguments)});g[s].s=+new Date;
-t=h.createElement(o);z=h.getElementsByTagName(o)[0];
-t.src='//www.google-analytics.com/analytics.js';
-z.parentNode.insertBefore(t,z)}(window,document,'script','ga'));
-ga('create',ga_ua);ga('send','pageview');
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-272608-7']);
+  _gaq.push(['_setDomainName', 'ghost.fredmaya.com']);
+  _gaq.push(['_trackPageview']);
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
 </script>
 
 </body>

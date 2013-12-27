@@ -2,6 +2,16 @@
 (function () {
     'use strict';
 
+    function ghostPaths() {
+        var path = window.location.pathname,
+            root = path.substr(0, path.search('/ghost/'));
+
+        return {
+            ghostRoot: root,
+            apiRoot: root + '/ghost/api/v0.1'
+        };
+    }
+
     var Ghost = {
         Layout      : {},
         Views       : {},
@@ -9,9 +19,7 @@
         Models      : {},
         Validate    : new Validator(),
 
-        settings: {
-            apiRoot: '/api/v0.1'
-        },
+        paths: ghostPaths(),
 
         // This is a helper object to denote legacy things in the
         // middle of being transitioned.
@@ -34,6 +42,9 @@
     };
 
     Ghost.init = function () {
+        // remove the temporary message which appears
+        $('.js-msg').remove();
+
         Ghost.router = new Ghost.Router();
 
         // This is needed so Backbone recognizes elements already rendered server side
@@ -43,7 +54,7 @@
         Backbone.history.start({
             pushState: true,
             hashChange: false,
-            root: '/ghost'
+            root: Ghost.paths.ghostRoot + '/ghost'
         });
     };
 
@@ -70,6 +81,7 @@
 
     window.Ghost = Ghost;
 
+    window.addEventListener("load", Ghost.init, false);
 }());
 
 // # Ghost Mobile Interactions
@@ -306,6 +318,13 @@
             case 'currentDate':
                 md = moment(new Date()).format('D MMMM YYYY');
                 this.elem.replaceSelection(md, 'end');
+                pass = false;
+                break;
+            case 'newLine':
+                cursor = this.elem.getCursor();
+                if (this.elem.getLine(cursor.line) !== "") {
+                    this.elem.setLine(cursor.line, this.elem.getLine(cursor.line) + "\n\n");
+                }
                 pass = false;
                 break;
             default:

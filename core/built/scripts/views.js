@@ -193,7 +193,7 @@
             this.renderItem(item);
         },
         clearEverything: function () {
-            this.$el.find('.js-notification.notification-passive').remove();
+            this.$el.find('.js-notification.notification-passive').parent().remove();
         },
         removeItem: function (e) {
             e.preventDefault();
@@ -205,8 +205,9 @@
                     headers: {
                         'X-CSRF-Token': $("meta[name='csrf-param']").attr('content')
                     },
-                    url: '/api/v0.1/notifications/' + $(self).find('.close').data('id')
+                    url: Ghost.paths.apiRoot + '/notifications/' + $(self).find('.close').data('id')
                 }).done(function (result) {
+                    /*jslint unparam:true*/
                     bbSelf.$el.slideUp(250, function () {
                         $(this).show().css({height: "auto"});
                         $(self).remove();
@@ -217,6 +218,7 @@
                     $(this)
                         .show()
                         .css({height: "auto"})
+                        .parent()
                         .remove();
                 });
             }
@@ -237,8 +239,9 @@
                 headers: {
                     'X-CSRF-Token': $("meta[name='csrf-param']").attr('content')
                 },
-                url: '/api/v0.1/notifications/' + $(self).data('id')
+                url: Ghost.paths.apiRoot + '/notifications/' + $(self).data('id')
             }).done(function (result) {
+                /*jslint unparam:true*/
                 var height = bbSelf.$('.js-notification').outerHeight(true),
                     $parent = $(self).parent();
                 bbSelf.$el.css({height: height});
@@ -388,7 +391,7 @@
     });
 }());
 
-/*global window, document, Ghost, $, _, Backbone, JST */
+/*global window, document, Ghost, $, _, Backbone, JST, NProgress */
 (function () {
     "use strict";
 
@@ -400,6 +403,13 @@
     // ----------
     Ghost.Views.Blog = Ghost.View.extend({
         initialize: function (options) {
+            /*jslint unparam:true*/
+            this.listenTo(this.collection, 'request', function () {
+                NProgress.start();
+            });
+            this.listenTo(this.collection, 'sync', function () {
+                NProgress.done();
+            });
             this.addSubview(new PreviewContainer({ el: '.js-content-preview', collection: this.collection })).render();
             this.addSubview(new ContentList({ el: '.js-content-list', collection: this.collection })).render();
         }
@@ -416,15 +426,21 @@
             'click .content-list-content'    : 'scrollHandler'
         },
 
-        initialize: function (options) {
+        initialize: function () {
             this.$('.content-list-content').scrollClass({target: '.content-list', offset: 10});
             this.listenTo(this.collection, 'remove', this.showNext);
+            this.listenTo(this.collection, 'add', this.renderPost);
             // Can't use backbone event bind (see: http://stackoverflow.com/questions/13480843/backbone-scroll-event-not-firing)
             this.$('.content-list-content').scroll($.proxy(this.checkScroll, this));
         },
 
         showNext: function () {
             if (this.isLoading) { return; }
+
+            if (!this.collection.length) {
+                return Backbone.trigger('blog:activeItem', null);
+            }
+
             var id = this.collection.at(0) ? this.collection.at(0).id : false;
             if (id) {
                 Backbone.trigger('blog:activeItem', id);
@@ -465,16 +481,17 @@
 
             // Load moar posts!
             this.isLoading = true;
-
             this.collection.fetch({
                 update: true,
                 remove: false,
                 data: {
                     status: 'all',
                     page: (self.collection.currentPage + 1),
+                    where: { page: 'all' },
                     orderBy: ['updated_at', 'DESC']
                 }
             }).then(function onSuccess(response) {
+                /*jslint unparam:true*/
                 self.render();
                 self.isLoading = false;
             }, function onError(e) {
@@ -482,9 +499,18 @@
             });
         },
 
+        renderPost: function (model) {
+            this.$('ol').append(this.addSubview(new ContentItem({model: model})).render().el);
+        },
+
         render: function () {
+            var $list = this.$('ol');
+
+            // Clear out any pre-existing subviews.
+            this.removeSubviews();
+
             this.collection.each(function (model) {
-                this.$('ol').append(this.addSubview(new ContentItem({model: model})).render().el);
+                $list.append(this.addSubview(new ContentItem({model: model})).render().el);
             }, this);
             this.showNext();
         }
@@ -505,6 +531,7 @@
 
         initialize: function () {
             this.listenTo(Backbone, 'blog:activeItem', this.checkActive);
+            this.listenTo(this.model, 'change:page', this.render);
             this.listenTo(this.model, 'destroy', this.removeItem);
         },
 
@@ -560,10 +587,12 @@
         activeId: null,
 
         events: {
-            'click .post-controls .post-edit' : 'editPost'
+            'click .post-controls .post-edit' : 'editPost',
+            'click .featured' : 'toggleFeatured',
+            'click .unfeatured' : 'toggleFeatured'
         },
 
-        initialize: function (options) {
+        initialize: function () {
             this.listenTo(Backbone, 'blog:activeItem', this.setActivePreview);
         },
 
@@ -578,16 +607,43 @@
             e.preventDefault();
             // for now this will disable "open in new tab", but when we have a Router implemented
             // it can go back to being a normal link to '#/ghost/editor/X'
-            window.location = '/ghost/editor/' + this.model.get('id') + '/';
+            window.location = Ghost.paths.ghostRoot + '/ghost/editor/' + this.model.get('id') + '/';
+        },
+
+        toggleFeatured: function (e) {
+            var self = this,
+                featured = !self.model.get('featured'),
+                featuredEl = $(e.currentTarget),
+                model = this.collection.get(this.activeId);
+
+            model.save({
+                featured: featured
+            }, {
+                success : function () {
+                    featuredEl.removeClass("featured unfeatured").addClass(featured ? "featured" : "unfeatured");
+                    Ghost.notifications.addItem({
+                        type: 'success',
+                        message: "Post successfully marked as " + (featured ? "featured" : "not featured") + ".",
+                        status: 'passive'
+                    });
+                },
+                error : function (model, xhr) {
+                    /*jslint unparam:true*/
+                    Ghost.notifications.addItem({
+                        type: 'error',
+                        message: Ghost.Views.Utils.getRequestErrorMessage(xhr),
+                        status: 'passive'
+                    });
+                }
+            });
         },
 
         templateName: "preview",
 
         render: function () {
-            if (this.activeId) {
-                this.model = this.collection.get(this.activeId);
-                this.$el.html(this.template(this.templateData()));
-            }
+            this.model = this.collection.get(this.activeId);
+            this.$el.html(this.template(this.templateData()));
+
             this.$('.content-preview-content').scrollClass({target: '.content-preview', offset: 10});
             this.$('.wrapper').on('click', 'a', function (e) {
                 $(e.currentTarget).attr('target', '_blank');
@@ -604,6 +660,7 @@
     });
 
 }());
+
 /*global window, document, Ghost, $, _, Backbone, JST */
 (function () {
     "use strict";
@@ -715,7 +772,7 @@
                     });
                 }
 
-                $(".tag-input").one("blur", function (e) {
+                $(".tag-input").one("blur", function () {
 
                     if (publishBar.hasClass("extended-tags") && !$(':hover').last().hasClass("tag")) {
                         publishBar.css("top", "auto").animate({"height": "40px"}, 300, "swing", function () {
@@ -945,7 +1002,9 @@
             {'key': 'Ctrl+Alt+W', 'style': 'selectword'},
             {'key': 'Ctrl+L', 'style': 'list'},
             {'key': 'Ctrl+Alt+C', 'style': 'copyHTML'},
-            {'key': 'Meta+Alt+C', 'style': 'copyHTML'}
+            {'key': 'Meta+Alt+C', 'style': 'copyHTML'},
+            {'key': 'Meta+Enter', 'style': 'newLine'},
+            {'key': 'Ctrl+Enter', 'style': 'newLine'}
         ],
         imageMarkdownRegex = /^(?:\{<(.*?)>\})?!(?:\[([^\n\]]*)\])(?:\(([^\n\]]*)\))?$/gim,
         markerRegex = /\{<([\w\W]*?)>\}/;
@@ -987,14 +1046,35 @@
             'published': 'Update Post'
         },
 
-        notificationMap: {
-            'draft': 'Your post has been saved as a draft.',
-            'published': 'Your post has been published.'
-        },
+        //TODO: This has to be moved to the I18n localization file.
+        //This structure is supposed to be close to the i18n-localization which will be used soon. 
+        messageMap: {
+            errors: {
+                post: {
+                    published: {
+                        'published': 'Your post could not be updated.',
+                        'draft': 'Your post could not be saved as a draft.'
+                    },
+                    draft: {
+                        'published': 'Your post could not be published.',
+                        'draft': 'Your post could not be saved as a draft.'
+                    }
 
-        errorMap: {
-            'draft': 'Your post could not be saved as a draft.',
-            'published': 'Your post could not be published.'
+                }
+            },
+
+            success: {
+                post: {
+                    published: {
+                        'published': 'Your post has been updated.',
+                        'draft': 'Your post has been saved as a draft.'
+                    },
+                    draft: {
+                        'published': 'Your post has been published.',
+                        'draft': 'Your post has been saved as a draft.'
+                    }
+                }
+            }
         },
 
         initialize: function () {
@@ -1010,9 +1090,6 @@
                 self.updatePost();
             });
             this.listenTo(this.model, 'change:status', this.render);
-            this.listenTo(this.model, 'change:id', function (m) {
-                Backbone.history.navigate('/editor/' + m.id + '/');
-            });
         },
 
         toggleStatus: function () {
@@ -1032,10 +1109,10 @@
             this.savePost({
                 status: keys[newIndex]
             }).then(function () {
-                self.reportSaveSuccess(status);
+                self.reportSaveSuccess(status, prevStatus);
             }, function (xhr) {
                 // Show a notification about the error
-                self.reportSaveError(xhr, model, status);
+                self.reportSaveError(xhr, model, status, prevStatus);
             });
         },
 
@@ -1098,7 +1175,7 @@
             this.savePost({
                 status: status
             }).then(function () {
-                self.reportSaveSuccess(status);
+                self.reportSaveSuccess(status, prevStatus);
                 // Refresh publish button and all relevant controls with updated status.
                 self.render();
             }, function (xhr) {
@@ -1107,7 +1184,7 @@
                 // Set appropriate button status
                 self.setActiveStatus(status, self.statusMap[status], prevStatus);
                 // Show a notification about the error
-                self.reportSaveError(xhr, model, status);
+                self.reportSaveError(xhr, model, status, prevStatus);
             });
         },
 
@@ -1130,17 +1207,18 @@
             return $.Deferred().reject();
         },
 
-        reportSaveSuccess: function (status) {
+        reportSaveSuccess: function (status, prevStatus) {
             Ghost.notifications.clearEverything();
             Ghost.notifications.addItem({
                 type: 'success',
-                message: this.notificationMap[status],
+                message: this.messageMap.success.post[prevStatus][status],
                 status: 'passive'
             });
+            Ghost.currentView.setEditorDirty(false);
         },
 
-        reportSaveError: function (response, model, status) {
-            var message = this.errorMap[status];
+        reportSaveError: function (response, model, status, prevStatus) {
+            var message = this.messageMap.errors.post[prevStatus][status];
 
             if (response) {
                 // Get message from response
@@ -1188,6 +1266,7 @@
     Ghost.Views.Editor = Ghost.View.extend({
 
         initialize: function () {
+            var self = this;
 
             // Add the container view for the Publish Bar
             this.addSubview(new PublishBar({el: "#publish-bar", model: this.model})).render();
@@ -1196,6 +1275,13 @@
             this.$('#entry-markdown').text(this.model.get('markdown'));
 
             this.listenTo(this.model, 'change:title', this.renderTitle);
+            this.listenTo(this.model, 'change:id', function (m) {
+                // This is a special case for browsers which fire an unload event when using navigate. The id change
+                // happens before the save success and can cause the unload alert to appear incorrectly on first save
+                // The id only changes in the event that the save has been successful, so this workaround is safes
+                self.setEditorDirty(false);
+                Backbone.history.navigate('/editor/' + m.id + '/');
+            });
 
             this.initMarkdown();
             this.renderPreview();
@@ -1226,6 +1312,10 @@
                 $(e.target).closest('section').addClass('active');
             });
 
+            // Deactivate default drag/drop action
+            $(document).bind('drop dragover', function (e) {
+                e.preventDefault();
+            });
         },
 
         events: {
@@ -1320,7 +1410,11 @@
                 tabMode: 'indent',
                 tabindex: "2",
                 lineWrapping: true,
-                dragDrop: false
+                dragDrop: false,
+                extraKeys: {
+                    Home: "goLineLeft",
+                    End: "goLineRight"
+                }
             });
             this.uploadMgr = new UploadManager(this.editor);
 
@@ -1349,8 +1443,21 @@
             return this.uploadMgr.getEditorValue();
         },
 
+        unloadDirtyMessage: function () {
+            return "==============================\n\n" +
+                "Hey there! It looks like you're in the middle of writing" +
+                " something and you haven't saved all of your content." +
+                "\n\nSave before you go!\n\n" +
+                "==============================";
+        },
+
+        setEditorDirty: function (dirty) {
+            window.onbeforeunload = dirty ? this.unloadDirtyMessage : null;
+        },
+
         initUploads: function () {
-            this.$('.js-drop-zone').upload({editor: true});
+            var filestorage = $('#entry-markdown-content').data('filestorage');
+            this.$('.js-drop-zone').upload({editor: true, fileStorage: filestorage});
             this.$('.js-drop-zone').on('uploadstart', $.proxy(this.disableEditor, this));
             this.$('.js-drop-zone').on('uploadfailure', $.proxy(this.enableEditor, this));
             this.$('.js-drop-zone').on('uploadsuccess', $.proxy(this.enableEditor, this));
@@ -1361,6 +1468,7 @@
             var self = this;
             this.editor.setOption("readOnly", false);
             this.editor.on('change', function () {
+                self.setEditorDirty(true);
                 self.renderPreview();
             });
         },
@@ -1551,11 +1659,13 @@
             var value = editor.getValue();
 
             _.each(markerMgr.markers, function (marker, id) {
+                /*jslint unparam:true*/
                 value = value.replace(markerMgr.getMarkerRegexForId(id), '');
             });
 
             return value;
         }
+
 
         // Public API
         _.extend(this, {
@@ -1565,6 +1675,7 @@
 
         // initialise
         editor.on('change', function (cm, changeObj) {
+            /*jslint unparam:true*/
             var linesChanged = _.range(changeObj.from.line, changeObj.from.line + changeObj.text.length);
 
             _.each(linesChanged, function (ln) {
@@ -1586,15 +1697,19 @@
 
         initialize: function () {
             this.render();
-            $(".js-login-box").css({"opacity": 0}).animate({"opacity": 1}, 500, function () {
-                $("[name='email']").focus();
-            });
         },
 
         templateName: "login",
 
         events: {
             'submit #login': 'submitHandler'
+        },
+
+        afterRender: function () {
+            var self = this;
+            this.$el.css({"opacity": 0}).animate({"opacity": 1}, 500, function () {
+                self.$("[name='email']").focus();
+            });
         },
 
         submitHandler: function (event) {
@@ -1611,7 +1726,7 @@
                 Ghost.Validate.handleErrors();
             } else {
                 $.ajax({
-                    url: '/ghost/signin/',
+                    url: Ghost.paths.ghostRoot + '/ghost/signin/',
                     type: 'POST',
                     headers: {
                         'X-CSRF-Token': $("meta[name='csrf-param']").attr('content')
@@ -1625,6 +1740,7 @@
                         window.location.href = msg.redirect;
                     },
                     error: function (xhr) {
+                        Ghost.notifications.clearEverything();
                         Ghost.notifications.addItem({
                             type: 'error',
                             message: Ghost.Views.Utils.getRequestErrorMessage(xhr),
@@ -1640,9 +1756,6 @@
 
         initialize: function () {
             this.render();
-            $(".js-signup-box").css({"opacity": 0}).animate({"opacity": 1}, 500, function () {
-                $("[name='name']").focus();
-            });
         },
 
         templateName: "signup",
@@ -1651,11 +1764,21 @@
             'submit #signup': 'submitHandler'
         },
 
+        afterRender: function () {
+            var self = this;
+
+            this.$el
+                .css({"opacity": 0})
+                .animate({"opacity": 1}, 500, function () {
+                    self.$("[name='name']").focus();
+                });
+        },
+
         submitHandler: function (event) {
             event.preventDefault();
-            var name = this.$el.find('.name').val(),
-                email = this.$el.find('.email').val(),
-                password = this.$el.find('.password').val();
+            var name = this.$('.name').val(),
+                email = this.$('.email').val(),
+                password = this.$('.password').val();
 
             // This is needed due to how error handling is done. If this is not here, there will not be a time
             // when there is no error.
@@ -1668,7 +1791,7 @@
                 Ghost.Validate.handleErrors();
             } else {
                 $.ajax({
-                    url: '/ghost/signup/',
+                    url: Ghost.paths.ghostRoot + '/ghost/signup/',
                     type: 'POST',
                     headers: {
                         'X-CSRF-Token': $("meta[name='csrf-param']").attr('content')
@@ -1682,6 +1805,7 @@
                         window.location.href = msg.redirect;
                     },
                     error: function (xhr) {
+                        Ghost.notifications.clearEverything();
                         Ghost.notifications.addItem({
                             type: 'error',
                             message: Ghost.Views.Utils.getRequestErrorMessage(xhr),
@@ -1697,15 +1821,19 @@
 
         initialize: function () {
             this.render();
-            $(".js-forgotten-box").css({"opacity": 0}).animate({"opacity": 1}, 500, function () {
-                $("[name='email']").focus();
-            });
         },
 
         templateName: "forgotten",
 
         events: {
             'submit #forgotten': 'submitHandler'
+        },
+
+        afterRender: function () {
+            var self = this;
+            this.$el.css({"opacity": 0}).animate({"opacity": 1}, 500, function () {
+                self.$("[name='email']").focus();
+            });
         },
 
         submitHandler: function (event) {
@@ -1720,7 +1848,7 @@
                 Ghost.Validate.handleErrors();
             } else {
                 $.ajax({
-                    url: '/ghost/forgotten/',
+                    url: Ghost.paths.ghostRoot + '/ghost/forgotten/',
                     type: 'POST',
                     headers: {
                         'X-CSRF-Token': $("meta[name='csrf-param']").attr('content')
@@ -1733,6 +1861,7 @@
                         window.location.href = msg.redirect;
                     },
                     error: function (xhr) {
+                        Ghost.notifications.clearEverything();
                         Ghost.notifications.addItem({
                             type: 'error',
                             message: Ghost.Views.Utils.getRequestErrorMessage(xhr),
@@ -1741,6 +1870,76 @@
                     }
                 });
             }
+        }
+    });
+
+    Ghost.Views.ResetPassword = Ghost.View.extend({
+        templateName: 'reset',
+
+        events: {
+            'submit #reset': 'submitHandler'
+        },
+
+        initialize: function (attrs) {
+            attrs = attrs || {};
+
+            this.token = attrs.token;
+
+            this.render();
+        },
+
+        afterRender: function () {
+            var self = this;
+            this.$el.css({"opacity": 0}).animate({"opacity": 1}, 500, function () {
+                self.$("[name='newpassword']").focus();
+            });
+        },
+
+        submitHandler: function (ev) {
+            ev.preventDefault();
+
+            var self = this,
+                newPassword = this.$('input[name="newpassword"]').val(),
+                ne2Password = this.$('input[name="ne2password"]').val();
+
+            if (newPassword !== ne2Password) {
+                Ghost.notifications.addItem({
+                    type: 'error',
+                    message: "Your passwords do not match.",
+                    status: 'passive'
+                });
+
+                return;
+            }
+
+            this.$('input, button').prop('disabled', true);
+
+            $.ajax({
+                url: Ghost.paths.ghostRoot + '/ghost/reset/' + this.token + '/',
+                type: 'POST',
+                headers: {
+                    'X-CSRF-Token': $("meta[name='csrf-param']").attr('content')
+                },
+                data: {
+                    newpassword: newPassword,
+                    ne2password: ne2Password
+                },
+                success: function (msg) {
+                    window.location.href = msg.redirect;
+                },
+                error: function (xhr) {
+                    self.$('input, button').prop('disabled', false);
+
+                    Ghost.notifications.clearEverything();
+                    Ghost.notifications.addItem({
+                        type: 'error',
+                        message: Ghost.Views.Utils.getRequestErrorMessage(xhr),
+                        status: 'passive'
+                    });
+                }
+            });
+
+            return false;
         }
     });
 }());
@@ -1758,6 +1957,7 @@
             'blur  .post-setting-slug' : 'editSlug',
             'click .post-setting-slug' : 'selectSlug',
             'blur  .post-setting-date' : 'editDate',
+            'click .post-setting-static-page' : 'toggleStaticPage',
             'click .delete' : 'deletePost'
         },
 
@@ -1766,6 +1966,7 @@
                 this.listenTo(this.model, 'change:id', this.render);
                 this.listenTo(this.model, 'change:status', this.render);
                 this.listenTo(this.model, 'change:published_at', this.render);
+                this.listenTo(this.model, 'change:page', this.render);
             }
         },
 
@@ -1776,12 +1977,18 @@
 
             $('.post-setting-slug').val(slug);
 
+            // Update page status test if already a page.
+            if (this.model && this.model.get('page')) {
+                $('.post-setting-static-page').prop('checked', this.model.get('page'));
+            }
+
             // Insert the published date, and make it editable if it exists.
             if (this.model && this.model.get('published_at')) {
-                pubDate = moment(pubDate).format('DD MMM YY');
+                pubDate = moment(pubDate).format('DD MMM YY HH:mm');
             }
 
             if (this.model && this.model.get('id')) {
+                this.$('.post-setting-page').removeClass('hidden');
                 this.$('.delete').removeClass('hidden');
             }
 
@@ -1809,6 +2016,7 @@
                 slug: newSlug
             }, {
                 success : function (model, response, options) {
+                    /*jslint unparam:true*/
                     // Repopulate slug in case it changed on the server (e.g. 'new-slug-2')
                     slugEl.value = model.get('slug');
                     Ghost.notifications.addItem({
@@ -1818,6 +2026,7 @@
                     });
                 },
                 error : function (model, xhr) {
+                    /*jslint unparam:true*/
                     Ghost.notifications.addItem({
                         type: 'error',
                         message: Ghost.Views.Utils.getRequestErrorMessage(xhr),
@@ -1830,52 +2039,82 @@
         editDate: function (e) {
             e.preventDefault();
             var self = this,
-                momentPubDate,
+                parseDateFormats = ['DD MMM YY HH:mm', 'DD MMM YYYY HH:mm', 'DD/MM/YY HH:mm', 'DD/MM/YYYY HH:mm', 'DD-MM-YY HH:mm', 'DD-MM-YYYY HH:mm'],
+                displayDateFormat = 'DD MMM YY HH:mm',
                 errMessage = '',
                 pubDate = self.model.get('published_at'),
                 pubDateEl = e.currentTarget,
-                newPubDate = pubDateEl.value;
+                newPubDate = pubDateEl.value,
+                pubDateMoment,
+                newPubDateMoment;
 
-            // Ensure the published date has changed
-            if (newPubDate.length === 0 || pubDate === newPubDate) {
-                pubDateEl.value = pubDate === undefined ? 'Not Published' : moment(pubDate).format("DD MMM YY");
+            // Ignore empty or unchanged dates
+            if (!newPubDate) {
                 return;
             }
 
-            // Validate new Published date
-            momentPubDate = moment(newPubDate, ["DD MMM YY", "DD MMM YYYY", "DD/MM/YY", "DD/MM/YYYY", "DD-MM-YY", "DD-MM-YYYY"]);
-            if (!momentPubDate.isValid()) {
-                errMessage = 'Published Date must be a valid date with format: DD MMM YY (e.g. 6 Dec 14)';
+            // Check for missing time stamp on new data
+            // If no time specified, add a 12:00
+            if (newPubDate && !newPubDate.slice(-5).match(/\d+:\d\d/)) {
+                newPubDate += " 12:00";
             }
 
-            if (momentPubDate.diff(new Date(), 'h') > 0) {
+            newPubDateMoment = moment(newPubDate, parseDateFormats);
+
+            // If there was a published date already set
+            if (pubDate) {
+                 // Check for missing time stamp on current model
+                // If no time specified, add a 12:00
+                if (!pubDate.slice(-5).match(/\d+:\d\d/)) {
+                    pubDate += " 12:00";
+                }
+
+                pubDateMoment = moment(pubDate, parseDateFormats);
+
+                 // Ensure the published date has changed
+                if (newPubDate.length === 0 || pubDateMoment.isSame(newPubDateMoment)) {
+                    // If it wasn't, reset it and return
+                    pubDateEl.value = pubDateMoment.format(displayDateFormat);
+                    return;
+                }
+            }
+
+            // Validate new Published date
+            if (!newPubDateMoment.isValid()) {
+                errMessage = 'Published Date must be a valid date with format: DD MMM YY HH:mm (e.g. 6 Dec 14 15:00)';
+            }
+
+            if (newPubDateMoment.diff(new Date(), 'h') > 0) {
                 errMessage = 'Published Date cannot currently be in the future.';
             }
 
             if (errMessage.length) {
+                // Show error message
                 Ghost.notifications.addItem({
                     type: 'error',
                     message: errMessage,
                     status: 'passive'
                 });
-                pubDateEl.value = moment(pubDate).format("DD MMM YY");
+
+                // Reset back to original value and return
+                pubDateEl.value = pubDateMoment ? pubDateMoment.format(displayDateFormat) : '';
                 return;
             }
 
             // Save new 'Published' date
             this.model.save({
-                // Temp Fix. Set hour to 12 instead of 00 to avoid some TZ issues.
-                published_at: momentPubDate.hour(12).toDate()
+                published_at: newPubDateMoment.toDate()
             }, {
-                success : function (model, response, options) {
-                    pubDateEl.value = moment(model.get('published_at')).format("DD MMM YY");
+                success : function (model) {
+                    pubDateEl.value = moment(model.get('published_at')).format(displayDateFormat);
                     Ghost.notifications.addItem({
                         type: 'success',
-                        message: "Publish date successfully changed to <strong>" + pubDateEl.value + '</strong>.',
+                        message: 'Publish date successfully changed to <strong>' + pubDateEl.value + '</strong>.',
                         status: 'passive'
                     });
                 },
                 error : function (model, xhr) {
+                    /*jslint unparam:true*/
                     Ghost.notifications.addItem({
                         type: 'error',
                         message: Ghost.Views.Utils.getRequestErrorMessage(xhr),
@@ -1884,6 +2123,33 @@
                 }
             });
 
+        },
+
+        toggleStaticPage: function (e) {
+            var pageEl = $(e.currentTarget),
+                page = this.model ? !this.model.get('page') : false;
+
+            this.model.save({
+                page: page
+            }, {
+                success : function (model, response, options) {
+                    /*jslint unparam:true*/
+                    pageEl.prop('checked', page);
+                    Ghost.notifications.addItem({
+                        type: 'success',
+                        message: "Successfully converted " + (page ? "to static page" : "to post") + '.',
+                        status: 'passive'
+                    });
+                },
+                error : function (model, xhr) {
+                    /*jslint unparam:true*/
+                    Ghost.notifications.addItem({
+                        type: 'error',
+                        message: Ghost.Views.Utils.getRequestErrorMessage(xhr),
+                        status: 'passive'
+                    });
+                }
+            });
         },
 
         deletePost: function (e) {
@@ -1901,7 +2167,7 @@
                                     }).then(function () {
                                         // Redirect to content screen if deleting post from editor.
                                         if (window.location.pathname.indexOf('editor') > -1) {
-                                            window.location = '/ghost/content/';
+                                            window.location = Ghost.paths.ghostRoot + '/ghost/content/';
                                         }
                                         Ghost.notifications.addItem({
                                             type: 'success',
@@ -1940,6 +2206,7 @@
     });
 
 }());
+
 /*global window, document, Ghost, $, _, Backbone, Countable */
 (function () {
     "use strict";
@@ -2052,12 +2319,9 @@
         afterRender: function () {
             this.$el.attr('id', this.id);
             this.$el.addClass('active');
-
-            this.$('input').iCheck({
-                checkboxClass: 'icheckbox_ghost'
-            });
         },
         saveSuccess: function (model, response, options) {
+            /*jslint unparam:true*/
             Ghost.notifications.clearEverything();
             // TODO: better messaging here?
             Ghost.notifications.addItem({
@@ -2067,6 +2331,7 @@
             });
         },
         saveError: function (model, xhr) {
+            /*jslint unparam:true*/
             Ghost.notifications.clearEverything();
             Ghost.notifications.addItem({
                 type: 'error',
@@ -2101,7 +2366,8 @@
                 title = this.$('#blog-title').val(),
                 description = this.$('#blog-description').val(),
                 email = this.$('#email-address').val(),
-                postsPerPage = this.$('#postsPerPage').val();
+                postsPerPage = this.$('#postsPerPage').val(),
+                permalinks = this.$('#permalinks').is(':checked') ? "/:year/:month/:day/:slug/" : "/:slug/";
 
             Ghost.Validate._errors = [];
             Ghost.Validate
@@ -2116,6 +2382,10 @@
             Ghost.Validate
                 .check(postsPerPage, {message: "Please use a number less than 1000", el: $('postsPerPage')})
                 .isInt().max(1000);
+            Ghost.Validate
+                .check(postsPerPage, {message: "Please use a number greater than 0", el: $('postsPerPage')})
+                .isInt().min(0);
+
 
             if (Ghost.Validate._errors.length > 0) {
                 Ghost.Validate.handleErrors();
@@ -2125,7 +2395,8 @@
                     description: description,
                     email: email,
                     postsPerPage: postsPerPage,
-                    activeTheme: this.$('#activeTheme').val()
+                    activeTheme: this.$('#activeTheme').val(),
+                    permalinks: permalinks
                 }, {
                     success: this.saveSuccess,
                     error: this.saveError
@@ -2143,27 +2414,28 @@
             this.showUpload('cover', settings.cover);
         },
         showUpload: function (key, src) {
-            var self = this, upload = new Ghost.Models.uploadModal({'key': key, 'src': src, 'accept': {
-                func: function () { // The function called on acceptance
-                    var data = {};
-                    if (this.$('.js-upload-url').val()) {
-                        data[key] = this.$('.js-upload-url').val();
-                    } else {
-                        data[key] = this.$('.js-upload-target').attr('src');
-                    }
+            var self = this,
+                upload = new Ghost.Models.uploadModal({'key': key, 'src': src, 'id': this.id, 'accept': {
+                    func: function () { // The function called on acceptance
+                        var data = {};
+                        if (this.$('.js-upload-url').val()) {
+                            data[key] = this.$('.js-upload-url').val();
+                        } else {
+                            data[key] = this.$('.js-upload-target').attr('src');
+                        }
 
-                    self.model.save(data, {
-                        success: self.saveSuccess,
-                        error: self.saveError
-                    }).then(function () {
-                        self.render();
-                    });
+                        self.model.save(data, {
+                            success: self.saveSuccess,
+                            error: self.saveError
+                        }).then(function () {
+                            self.saveSettings();
+                        });
 
-                    return true;
-                },
-                buttonClass: "button-save right",
-                text: "Save" // The accept button text
-            }});
+                        return true;
+                    },
+                    buttonClass: "button-save right",
+                    text: "Save" // The accept button text
+                }});
 
             this.addSubview(new Ghost.Views.Modal({
                 model: upload
@@ -2179,6 +2451,8 @@
 
     // ### User profile
     Settings.user = Settings.Pane.extend({
+        templateName: 'settings/user-profile',
+
         id: 'user',
 
         options: {
@@ -2189,7 +2463,8 @@
             'click .button-save': 'saveUser',
             'click .button-change-password': 'changePassword',
             'click .js-modal-cover': 'showCover',
-            'click .js-modal-image': 'showImage'
+            'click .js-modal-image': 'showImage',
+            'keyup .user-profile': 'handleEnterKeyOnForm'
         },
         showCover: function (e) {
             e.preventDefault();
@@ -2202,7 +2477,7 @@
             this.showUpload('image', user.image);
         },
         showUpload: function (key, src) {
-            var self = this, upload = new Ghost.Models.uploadModal({'key': key, 'src': src, 'accept': {
+            var self = this, upload = new Ghost.Models.uploadModal({'key': key, 'src': src, 'id': this.id, 'accept': {
                 func: function () { // The function called on acceptance
                     var data = {};
                     if (this.$('.js-upload-url').val()) {
@@ -2214,7 +2489,7 @@
                         success: self.saveSuccess,
                         error: self.saveError
                     }).then(function () {
-                        self.render();
+                        self.saveUser();
                     });
                     return true;
                 },
@@ -2227,6 +2502,31 @@
             }));
         },
 
+        handleEnterKeyOnForm: function (ev) {
+            // Don't worry about it unless it's an enter key
+            if (ev.which !== 13) {
+                return;
+            }
+
+            var $target = $(ev.target);
+
+            if ($target.is("textarea")) {
+                // Allow enter key on user bio text area.
+                return;
+            }
+
+            if ($target.is('input[type=password]')) {
+                // Change password if on a password input
+                return this.changePassword(ev);
+            }
+
+            // Simulate clicking save otherwise
+            ev.preventDefault();
+
+            this.saveUser(ev);
+
+            return false;
+        },
 
         saveUser: function () {
             var self = this,
@@ -2323,18 +2623,18 @@
             }
         },
 
-        templateName: 'settings/user-profile',
-
         afterRender: function () {
             var self = this;
+
             Countable.live(document.getElementById('user-bio'), function (counter) {
+                var bioContainer = self.$('.bio-container .word-count');
                 if (counter.all > 180) {
-                    self.$('.bio-container .word-count').css({color: "#e25440"});
+                    bioContainer.css({color: "#e25440"});
                 } else {
-                    self.$('.bio-container .word-count').css({color: "#9E9D95"});
+                    bioContainer.css({color: "#9E9D95"});
                 }
 
-                self.$('.bio-container .word-count').text(200 - counter.all);
+                bioContainer.text(200 - counter.all);
 
             });
 
@@ -2344,7 +2644,7 @@
 
 }());
 
-/*global window, document, Ghost, Backbone, $, _ */
+/*global window, document, Ghost, Backbone, $, _, NProgress */
 (function () {
     "use strict";
 
@@ -2359,7 +2659,8 @@
             'register/'        : 'register',
             'signup/'          : 'signup',
             'signin/'          : 'login',
-            'forgotten/'       : 'forgotten'
+            'forgotten/'       : 'forgotten',
+            'reset/:token/'     : 'reset'
         },
 
         signup: function () {
@@ -2374,10 +2675,16 @@
             Ghost.currentView = new Ghost.Views.Forgotten({ el: '.js-forgotten-box' });
         },
 
+        reset: function (token) {
+            Ghost.currentView = new Ghost.Views.ResetPassword({ el: '.js-reset-box', token: token });
+        },
+
         blog: function () {
             var posts = new Ghost.Collections.Posts();
-            posts.fetch({ data: { status: 'all', orderBy: ['updated_at', 'DESC'] } }).then(function () {
+            NProgress.start();
+            posts.fetch({ data: { status: 'all', orderBy: ['updated_at', 'DESC'], where: { page: 'all' } } }).then(function () {
                 Ghost.currentView = new Ghost.Views.Blog({ el: '#main', collection: posts });
+                NProgress.done();
             });
         },
 
@@ -2399,10 +2706,10 @@
 
         editor: function (id) {
             var post = new Ghost.Models.Post();
-            post.urlRoot = Ghost.settings.apiRoot + '/posts';
+            post.urlRoot = Ghost.paths.apiRoot + '/posts';
             if (id) {
                 post.id = id;
-                post.fetch().then(function () {
+                post.fetch({ data: {status: 'all'}}).then(function () {
                     Ghost.currentView = new Ghost.Views.Editor({ el: '#main', model: post });
                 });
             } else {

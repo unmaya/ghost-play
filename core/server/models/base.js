@@ -4,13 +4,14 @@ var ghostBookshelf,
     moment    = require('moment'),
     _         = require('underscore'),
     uuid      = require('node-uuid'),
-    config    = require('../../../config'),
+    config    = require('../config'),
     Validator = require('validator').Validator,
+    unidecode = require('unidecode'),
     sanitize  = require('validator').sanitize;
 
 // Initializes a new Bookshelf instance, for reference elsewhere in Ghost.
-ghostBookshelf = Bookshelf.initialize(config[process.env.NODE_ENV || 'development'].database);
-ghostBookshelf.client = config[process.env.NODE_ENV].database.client;
+ghostBookshelf = Bookshelf.ghost = Bookshelf.initialize(config().database);
+ghostBookshelf.client = config().database.client;
 
 ghostBookshelf.validator = new Validator();
 
@@ -84,12 +85,17 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
 
     // #### generateSlug
     // Create a string act as the permalink for an object.
-    generateSlug: function (Model, base) {
+    generateSlug: function (Model, base, readOptions) {
         var slug,
             slugTryCount = 1,
             // Look for a post with a matching slug, append an incrementing number if so
             checkIfSlugExists = function (slugToFind) {
-                return Model.read({slug: slugToFind}).then(function (found) {
+                var args = {slug: slugToFind};
+                //status is needed for posts
+                if (readOptions && readOptions.status) {
+                    args.status = readOptions.status;
+                }
+                return Model.findOne(args, readOptions).then(function (found) {
                     var trimSpace;
 
                     if (!found) {
@@ -122,8 +128,10 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
             // Make the whole thing lowercase
             .toLowerCase();
 
-        // Remove trailing hypen
+        // Remove trailing hyphen
         slug = slug.charAt(slug.length - 1) === '-' ? slug.substr(0, slug.length - 1) : slug;
+        // Remove non ascii characters
+        slug = unidecode(slug);
         // Check the filtered slug doesn't match any of the reserved keywords
         slug = /^(ghost|ghost\-admin|admin|wp\-admin|wp\-login|dashboard|logout|login|signin|signup|signout|register|archive|archives|category|categories|tag|tags|page|pages|post|posts|user|users)$/g
             .test(slug) ? slug + '-post' : slug;
@@ -173,7 +181,7 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
     edit: function (editedObj, options) {
         options = options || {};
         return this.forge({id: editedObj.id}).fetch(options).then(function (foundObj) {
-            return foundObj.save(editedObj);
+            return foundObj.save(editedObj, options);
         });
     },
 
@@ -188,7 +196,7 @@ ghostBookshelf.Model = ghostBookshelf.Model.extend({
      */
     add: function (newObj, options) {
         options = options || {};
-        return this.forge(newObj).save(options);
+        return this.forge(newObj).save(null, options);
     },
 
     create: function () {
