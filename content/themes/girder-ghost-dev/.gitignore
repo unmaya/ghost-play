@@ -18,6 +18,7 @@ node_modules
 *.iml
 projectFilesBackup
 
+<<<<<<< HEAD
 .DS_Store
 
 Gruntfile.js
@@ -28,3 +29,6 @@ package.json
 /assets/_components
 /assets/_scss
 
+=======
+.DS_Store
+>>>>>>> 88a0749... fixing fatal error
