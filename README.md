@@ -5,7 +5,7 @@ I'm making a theme for Ghost v0.3 - v0.4 and using this repo to deploy it as a H
 http://ghost.fredmaya.com
 
 ### Want to use it?
-Sure! Its compatible with Ghost v.0.3
+Sure! Its still evolving but fully compatible with Ghost v.0.3 at its current state.
 
 ### Can you clone this and deploy it to Heroku
 Yes, but... Ghost doesn't officially support Heroku yet, this code is experimental and highly modified to work in that environment. You've been warned but here are some things to note before you dive in:
