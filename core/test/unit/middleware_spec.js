@@ -5,15 +5,15 @@ var assert          = require('assert'),
     when            = require('when'),
     _               = require('underscore'),
     express         = require('express'),
-    Ghost           = require('../../ghost'),
+    api             = require('../../server/api');
     middleware      = require('../../server/middleware').middleware;
 
 describe('Middleware', function () {
 
     describe('auth', function () {
-        var req, res, ghost = new Ghost();
+        var req, res;
 
-        beforeEach(function () {
+        beforeEach(function (done) {
             req = {
                 session: {}
             };
@@ -22,42 +22,51 @@ describe('Middleware', function () {
                 redirect: sinon.spy()
             };
 
-            ghost.notifications = [];
+            api.notifications.destroyAll().then(function () {
+                return done();
+            });
         });
 
         it('should redirect to signin path', function (done) {
 
             req.path = '';
 
-            middleware.auth(req, res, null);
-            assert(res.redirect.calledWithMatch('/ghost/signin/'));
-            return done();
+            middleware.auth(req, res, null).then(function () {
+                assert(res.redirect.calledWithMatch('/ghost/signin/'));
+                return done();    
+            });
+            
         });
 
         it('should redirect to signin path with redirect paramater stripped of /ghost/', function(done) {
             var path = 'test/path/party';
 
             req.path = '/ghost/' + path;
-
-            middleware.auth(req, res, null);
-            assert(res.redirect.calledWithMatch('/ghost/signin/?r=' + encodeURIComponent(path)));
-            return done();
+            middleware.auth(req, res, null).then(function () {
+                assert(res.redirect.calledWithMatch('/ghost/signin/?r=' + encodeURIComponent(path)));
+                return done();
+            });
         });
 
         it('should only add one message to the notification array', function (done) {
             var path = 'test/path/party';
 
             req.path = '/ghost/' + path;
-
-            middleware.auth(req, res, null);
-            assert(res.redirect.calledWithMatch('/ghost/signin/?r=' + encodeURIComponent(path)));
-            assert.equal(ghost.notifications.length, 1);
-
-            middleware.auth(req, res, null);
-            assert(res.redirect.calledWithMatch('/ghost/signin/?r=' + encodeURIComponent(path)));
-            assert.equal(ghost.notifications.length, 1);
-
-            return done();
+            middleware.auth(req, res, null).then(function () {
+                assert(res.redirect.calledWithMatch('/ghost/signin/?r=' + encodeURIComponent(path)));
+                return api.notifications.browse().then(function (notifications) {
+                    assert.equal(notifications.length, 1);
+                    return;
+                });
+            }).then(function () {
+                return middleware.auth(req, res, null);
+            }).then(function () {
+                assert(res.redirect.calledWithMatch('/ghost/signin/?r=' + encodeURIComponent(path)));
+                return api.notifications.browse().then(function (notifications) {
+                    assert.equal(notifications.length, 1);
+                    return done();
+                });
+            });
         });
 
         it('should call next if session user exists', function (done) {
@@ -133,33 +142,37 @@ describe('Middleware', function () {
     });
 
     describe('cleanNotifications', function () {
-        var ghost = new Ghost();
 
-        beforeEach(function () {
-            ghost.notifications = [
-                {
+        beforeEach(function (done) {
+            api.notifications.add({
+                    id: 0,
                     status: 'passive',
                     message: 'passive-one'
-                },
-                {
-                    status: 'passive',
-                    message: 'passive-two'
-                },
-                {
-                    status: 'aggressive',
-                    message: 'aggressive'
-                }
-            ];
+                }).then(function () {
+                    return api.notifications.add({
+                        id: 1,
+                        status: 'passive',
+                        message: 'passive-two'});
+                }).then(function () {
+                    return api.notifications.add({
+                        id: 2,
+                        status: 'aggressive',
+                        message: 'aggressive'});
+                }).then(function () {
+                    done();
+                });
         });
 
         it('should clean all passive messages', function (done) {
             middleware.cleanNotifications(null, null, function () {
-                assert.equal(ghost.notifications.length, 1);
-                var passiveMsgs = _.filter(ghost.notifications, function (notification) {
-                    return notification.status === 'passive';
+                api.notifications.browse().then(function (notifications) {
+                    should(notifications.length).eql(1);
+                    var passiveMsgs = _.filter(notifications, function (notification) {
+                        return notification.status === 'passive';
+                    });
+                    assert.equal(passiveMsgs.length, 0);
+                    return done();
                 });
-                assert.equal(passiveMsgs.length, 0);
-                return done();
             });
         });
     });
@@ -185,11 +198,11 @@ describe('Middleware', function () {
     });
 
     describe('whenEnabled', function () {
-        var cbFn, ghost = new Ghost();
+        var cbFn, server;
 
         beforeEach(function () {
             cbFn = sinon.spy();
-            ghost.server = {
+            server = {
                 enabled: function (setting) {
                     if (setting === 'enabled') {
                         return true;
@@ -198,6 +211,7 @@ describe('Middleware', function () {
                     }
                 }
             };
+            middleware.cacheServer(server);
         });
 
         it('should call function if setting is enabled', function (done) {

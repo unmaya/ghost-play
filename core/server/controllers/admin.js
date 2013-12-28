@@ -1,16 +1,12 @@
-var Ghost         = require('../../ghost'),
-    config        = require('../config'),
+var config        = require('../config'),
     _             = require('underscore'),
     path          = require('path'),
-    url           = require('url'),
     when          = require('when'),
     api           = require('../api'),
     mailer        = require('../mail'),
     errors        = require('../errorHandling'),
     storage       = require('../storage'),
 
-    ghost         = new Ghost(),
-    dataProvider  = ghost.dataProvider,
     adminNavbar,
     adminControllers,
     loginSecurity = [];
@@ -75,8 +71,7 @@ adminControllers = {
         });
     },
     'auth': function (req, res) {
-        var root = ghost.blogGlobals().path === '/' ? '' : ghost.blogGlobals().path,
-            currentTime = process.hrtime()[0],
+        var currentTime = process.hrtime()[0],
             denied = '';
         loginSecurity = _.filter(loginSecurity, function (ipTime) {
             return (ipTime.time + 2 > currentTime);
@@ -91,7 +86,7 @@ adminControllers = {
                 req.session.regenerate(function (err) {
                     if (!err) {
                         req.session.user = user.id;
-                        var redirect = root + '/ghost/';
+                        var redirect = config.paths().webroot + '/ghost/';
                         if (req.body.redirect) {
                             redirect += decodeURIComponent(req.body.redirect);
                         }
@@ -127,8 +122,7 @@ adminControllers = {
         });
     },
     'doRegister': function (req, res) {
-        var root = ghost.blogGlobals().path === '/' ? '' : ghost.blogGlobals().path,
-            name = req.body.name,
+        var name = req.body.name,
             email = req.body.email,
             password = req.body.password;
 
@@ -143,7 +137,7 @@ adminControllers = {
                         if (req.session.user === undefined) {
                             req.session.user = user.id;
                         }
-                        res.json(200, {redirect: root + '/ghost/'});
+                        res.json(200, {redirect: config.paths().webroot + '/ghost/'});
                     }
                 });
             });
@@ -160,12 +154,11 @@ adminControllers = {
         });
     },
     'generateResetToken': function (req, res) {
-        var root = ghost.blogGlobals().path === '/' ? '' : ghost.blogGlobals().path,
-            email = req.body.email;
+        var email = req.body.email;
 
         api.users.generateResetToken(email).then(function (token) {
             var siteLink = '<a href="' + config().url + '">' + config().url + '</a>',
-                resetUrl = url.resolve(config().url, '/ghost/reset/') + token + '/',
+                resetUrl = config().url.replace(/\/$/, '') +  '/ghost/reset/' + token + '/',
                 resetLink = '<a href="' + resetUrl + '">' + resetUrl + '</a>',
                 message = {
                     to: email,
@@ -186,7 +179,7 @@ adminControllers = {
             };
 
             return api.notifications.add(notification).then(function () {
-                res.json(200, {redirect: root + '/ghost/signin/'});
+                res.json(200, {redirect: config.paths().webroot + '/ghost/signin/'});
             });
 
         }, function failure(error) {
@@ -200,9 +193,8 @@ adminControllers = {
         });
     },
     'reset': function (req, res) {
-        var root = ghost.blogGlobals().path === '/' ? '' : ghost.blogGlobals().path,
-            // Validate the request token
-            token = req.params.token;
+        // Validate the request token
+        var token = req.params.token;
 
         api.users.validateToken(token).then(function () {
             // Render the reset form
@@ -223,13 +215,12 @@ adminControllers = {
             errors.logError(err, 'admin.js', "Please check the provided token for validity and expiration.");
 
             return api.notifications.add(notification).then(function () {
-                res.redirect(root + '/ghost/forgotten');
+                res.redirect(config.paths().webroot + '/ghost/forgotten');
             });
         });
     },
     'resetPassword': function (req, res) {
-        var root = ghost.blogGlobals().path === '/' ? '' : ghost.blogGlobals().path,
-            token = req.params.token,
+        var token = req.params.token,
             newPassword = req.param('newpassword'),
             ne2Password = req.param('ne2password');
 
@@ -242,7 +233,7 @@ adminControllers = {
             };
 
             return api.notifications.add(notification).then(function () {
-                res.json(200, {redirect: root + '/ghost/signin/'});
+                res.json(200, {redirect: config.paths().webroot + '/ghost/signin/'});
             });
         }).otherwise(function (err) {
             // TODO: Better error message if we can tell whether the passwords didn't match or something
@@ -252,8 +243,7 @@ adminControllers = {
     'logout': function (req, res) {
         req.session.destroy();
 
-        var root = ghost.blogGlobals().path === '/' ? '' : ghost.blogGlobals().path,
-            notification = {
+        var notification = {
                 type: 'success',
                 message: 'You were successfully signed out',
                 status: 'passive',
@@ -261,7 +251,7 @@ adminControllers = {
             };
 
         return api.notifications.add(notification).then(function () {
-            res.redirect(root + '/ghost/signin/');
+            res.redirect(config.paths().webroot + '/ghost/signin/');
         });
     },
     'index': function (req, res) {

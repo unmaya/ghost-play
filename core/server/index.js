@@ -14,22 +14,63 @@ var config       = require('./config'),
     path         = require('path'),
     Polyglot     = require('node-polyglot'),
     mailer       = require('./mail'),
-    Ghost        = require('../ghost'),
     helpers      = require('./helpers'),
     middleware   = require('./middleware'),
     routes       = require('./routes'),
     packageInfo  = require('../../package.json'),
+    models        = require('./models'),
+    permissions   = require('./permissions'),
+    uuid          = require('node-uuid'),
+    api           = require('./api'),
+    hbs          = require('express-hbs'),
 
 // Variables
-    ghost = new Ghost(),
     setup,
-    init;
+    init,
+    dbHash;
 
 // If we're in development mode, require "when/console/monitor"
 // for help in seeing swallowed promise errors, and log any
 // stderr messages from bluebird promises.
 if (process.env.NODE_ENV === 'development') {
     require('when/monitor/console');
+}
+
+function doFirstRun() {
+    var firstRunMessage = [
+        'Welcome to Ghost.',
+        'You\'re running under the <strong>',
+        process.env.NODE_ENV,
+        '</strong>environment.',
+
+        'Your URL is set to',
+        '<strong>' + config().url + '</strong>.',
+        'See <a href="http://docs.ghost.org/">http://docs.ghost.org</a> for instructions.'
+    ];
+
+    return api.notifications.add({
+        type: 'info',
+        message: firstRunMessage.join(' '),
+        status: 'persistent',
+        id: 'ghost-first-run'
+    });
+}
+
+function initDbHashAndFirstRun() {
+    return when(api.settings.read('dbHash')).then(function (hash) {
+        // we already ran this, chill
+        // Holds the dbhash (mainly used for cookie secret)
+        dbHash = hash.value;
+
+        if (dbHash === null) {
+            var initHash = uuid.v4();
+            return when(api.settings.edit('dbHash', initHash)).then(function (settings) {
+                dbHash = settings.dbHash;
+                return dbHash;
+            }).then(doFirstRun);
+        }
+        return dbHash.value;
+    });
 }
 
 // Sets up the express server instance.
@@ -41,28 +82,52 @@ function setup(server) {
     // Set up Polygot instance on the require module
     Polyglot.instance = new Polyglot();
 
-    when(ghost.init()).then(function () {
+    // ### Initialisation
+    when.join(
+        // Initialise the models
+        models.init(),
+        // Calculate paths
+        config.paths.update(config().url)
+    ).then(function () {
+        // Populate any missing default settings
+        return models.Settings.populateDefaults();
+    }).then(function () {
+        // Initialize the settings cache
+        return api.init();
+    }).then(function () {
+        // We must pass the api.settings object
+        // into this method due to circular dependencies.
+        return config.theme.update(api.settings, config().url);
+    }).then(function () {
         return when.join(
-            // Initialise mail after first run,
-            // passing in config module to prevent
-            // circular dependencies.
-            mailer.init(ghost, config),
-            helpers.loadCoreHelpers(ghost, config)
+            // Check for or initialise a dbHash.
+            initDbHashAndFirstRun(),
+            // Initialize the permissions actions and objects
+            permissions.init()
         );
     }).then(function () {
+        // Initialize mail
+        return mailer.init();
+    }).then(function () {
+        var adminHbs = hbs.create();
 
         // ##Configuration
-        // set the view engine
-        server.set('view engine', 'hbs');
-
-        // set the configured URL
-        server.set('ghost root', ghost.blogGlobals().path);
 
         // return the correct mime type for woff filess
         express['static'].mime.define({'application/font-woff': ['woff']});
 
+        // ## View engine
+        // set the view engine
+        server.set('view engine', 'hbs');
+
+        // Create a hbs instance for admin and init view engine
+        server.set('admin view engine', adminHbs.express3({partialsDir: config.paths().adminViews + 'partials'}));
+
+        // Load helpers
+        helpers.loadCoreHelpers(adminHbs);
+
         // ## Middleware
-        middleware(server);
+        middleware(server, dbHash);
 
         // ## Routing
 
@@ -78,7 +143,7 @@ function setup(server) {
         // Are we using sockets? Custom socket or the default?
         function getSocket() {
             if (config().server.hasOwnProperty('socket')) {
-                return _.isString(config().server.socket) ? config().server.socket : path.join(__dirname, '../content/', process.env.NODE_ENV + '.socket');
+                return _.isString(config().server.socket) ? config().server.socket : path.join(config.path().contentPath, process.env.NODE_ENV + '.socket');
             }
             return false;
         }
@@ -92,7 +157,7 @@ function setup(server) {
                     packageInfo.engines.node.yellow,
                     "you are using version".red,
                     process.versions.node.yellow,
-                    "\nPlease go to http://nodejs.org to get the latest version".green
+                    "\nPlease go to http://nodejs.org to get a supported version".green
                 );
 
                 process.exit(0);
@@ -138,11 +203,8 @@ function setup(server) {
 
         }
 
-        // Expose the express server on the ghost instance.
-        ghost.server = server;
-
         // Initialize plugins then start the server
-        plugins.init(ghost).then(function () {
+        plugins.init().then(function () {
 
             // ## Start Ghost App
             if (getSocket()) {
