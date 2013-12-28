@@ -94,7 +94,8 @@
                 data: {
                     status: 'all',
                     page: (self.collection.currentPage + 1),
-                    staticPages: 'all'
+                    where: { page: 'all' },
+                    orderBy: ['updated_at', 'DESC']
                 }
             }).then(function onSuccess(response) {
                 /*jslint unparam:true*/
@@ -137,7 +138,7 @@
 
         initialize: function () {
             this.listenTo(Backbone, 'blog:activeItem', this.checkActive);
-            this.listenTo(this.model, 'change:page change:featured', this.render);
+            this.listenTo(this.model, 'change:page', this.render);
             this.listenTo(this.model, 'destroy', this.removeItem);
         },
 
@@ -255,7 +256,7 @@
                 $(e.currentTarget).attr('target', '_blank');
             });
 
-            if (this.model !== undefined) {
+            if (this.model !== 'undefined') {
                 this.addSubview(new Ghost.View.PostSettings({el: $('.post-controls'), model: this.model})).render();
             }
 

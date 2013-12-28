@@ -2,14 +2,19 @@
 var _           = require('underscore'),
     when        = require('when'),
     errors      = require('../errorHandling'),
-    api         = require('../api'),
+    ghostApi,
     loader      = require('./loader'),
-    // Holds the available plugins
-    availablePlugins = {};
+    availablePlugins;
 
+// Holds the available plugins
+availablePlugins = {};
 
 function getInstalledPlugins() {
-    return api.settings.read('installedPlugins').then(function (installed) {
+    if (!ghostApi) {
+        ghostApi = require('../api');
+    }
+
+    return ghostApi.settings.read('installedPlugins').then(function (installed) {
         installed.value = installed.value || '[]';
 
         try {
@@ -26,19 +31,17 @@ function saveInstalledPlugins(installedPlugins) {
     return getInstalledPlugins().then(function (currentInstalledPlugins) {
         var updatedPluginsInstalled = _.uniq(installedPlugins.concat(currentInstalledPlugins));
 
-        return api.settings.edit('installedPlugins', updatedPluginsInstalled);
+        return ghostApi.settings.edit('installedPlugins', updatedPluginsInstalled);
     });
 }
 
 module.exports = {
-    init: function () {
+    init: function (ghost) {
         var pluginsToLoad;
 
         try {
             // We have to parse the value because it's a string
-            api.settings.read('activePlugins').then(function (aPlugins) {
-                pluginsToLoad = JSON.parse(aPlugins.value) || [];
-            });
+            pluginsToLoad = JSON.parse(ghost.settings('activePlugins')) || [];
         } catch (e) {
             errors.logError(
                 'Failed to parse activePlugins setting value: ' + e.message,
@@ -60,14 +63,14 @@ module.exports = {
                 loadPromises = _.map(pluginsToLoad, function (plugin) {
                     // If already installed, just activate the plugin
                     if (_.contains(installedPlugins, plugin)) {
-                        return loader.activatePluginByName(plugin).then(function (loadedPlugin) {
+                        return loader.activatePluginByName(plugin, ghost).then(function (loadedPlugin) {
                             return recordLoadedPlugin(plugin, loadedPlugin);
                         });
                     }
 
                     // Install, then activate the plugin
-                    return loader.installPluginByName(plugin).then(function () {
-                        return loader.activatePluginByName(plugin);
+                    return loader.installPluginByName(plugin, ghost).then(function () {
+                        return loader.activatePluginByName(plugin, ghost);
                     }).then(function (loadedPlugin) {
                         return recordLoadedPlugin(plugin, loadedPlugin);
                     });

@@ -1,49 +1,25 @@
-/*globals describe, beforeEach, afterEach, it*/
+/*globals describe, beforeEach, it*/
 var testUtils = require('../utils'),
-    should    = require('should'),
-    sinon     = require('sinon'),
-    when      = require('when'),
-    _         = require('underscore'),
-    path      = require('path'),
-    api       = require('../../server/api'),
-    hbs = require('express-hbs'),
+    should = require('should'),
+    sinon = require('sinon'),
+    when = require('when'),
+    _ = require('underscore'),
+    path = require('path'),
 
     // Stuff we are testing
-    handlebars = hbs.handlebars,
+    handlebars = require('express-hbs').handlebars,
     helpers = require('../../server/helpers'),
-    config = require('../../server/config');
+    Ghost = require('../../ghost');
 
 describe('Core Helpers', function () {
 
-    var ghost,
-        sandbox,
-        apiStub;
+    var ghost;
 
     beforeEach(function (done) {
-        var adminHbs = hbs.create();
-        sandbox = sinon.sandbox.create();
-        apiStub = sandbox.stub(api.settings, 'read', function () {
-            return when({value: 'casper'});
-        });
-
-        config.theme = sandbox.stub(config, 'theme', function () {
-            return {
-                title: 'Ghost',
-                description: 'Just a blogging platform.',
-                url: 'http://testurl.com'
-            };
-        });
-
-        helpers.loadCoreHelpers(adminHbs);
-        // Load template helpers in handlebars
-        hbs.express3({ partialsDir: [config.paths().helperTemplates] });
-        hbs.cachePartials(function () {
+        ghost = new Ghost();
+        helpers.loadCoreHelpers(ghost).then(function () {
             done();
-        });
-    });
-
-    afterEach(function () {
-        sandbox.restore();
+        }, done);
     });
 
     describe('Content Helper', function () {
@@ -157,20 +133,6 @@ describe('Core Helpers', function () {
         it('can truncate html by word', function () {
             var html = "<p>Hello <strong>World! It's me!</strong></p>",
                 expected = "Hello World",
-                rendered = (
-                    helpers.excerpt.call(
-                        {html: html},
-                        {"hash": {"words": "2"}}
-                    )
-                );
-
-            should.exist(rendered);
-            rendered.string.should.equal(expected);
-        });
-
-        it('can truncate html with non-ascii characters by word', function () {
-            var html = "<p>Едквюэ опортэат <strong>праэчынт ючю но, квуй эю</strong></p>",
-                expected = "Едквюэ опортэат",
                 rendered = (
                     helpers.excerpt.call(
                         {html: html},
@@ -302,9 +264,9 @@ describe('Core Helpers', function () {
         });
 
         it('returns meta tag string', function (done) {
-            helpers.ghost_foot.call({version: "0.9"}).then(function (rendered) {
+            helpers.ghost_foot.call().then(function (rendered) {
                 should.exist(rendered);
-                rendered.string.should.match(/<script src=".*\/shared\/vendor\/jquery\/jquery.js\?v=0.9"><\/script>/);
+                rendered.string.should.match(/<script src=".*\/shared\/vendor\/jquery\/jquery.js"><\/script>/);
 
                 done();
             }).then(null, done);
@@ -316,36 +278,33 @@ describe('Core Helpers', function () {
             should.exist(handlebars.helpers.url);
         });
 
-        it('should return the slug with a prefix slash if the context is a post', function () {
-            helpers.url.call({html: 'content', markdown: "ff", title: "title", slug: "slug", created_at: new Date(0)}).then(function (rendered) {
-                should.exist(rendered);
-                rendered.should.equal('/slug/');
-            });
+        it('should return a the slug with a prefix slash if the context is a post', function () {
+            var rendered = helpers.url.call({html: 'content', markdown: "ff", title: "title", slug: "slug", created_at: new Date(0)});
+            should.exist(rendered);
+            rendered.should.equal('/slug/');
         });
 
         it('should output an absolute URL if the option is present', function () {
-            helpers.url.call(
+            var configStub = sinon.stub(ghost, "blogGlobals", function () {
+                    return { url: 'http://testurl.com' };
+                }),
+
+                rendered = helpers.url.call(
                     {html: 'content', markdown: "ff", title: "title", slug: "slug", created_at: new Date(0)},
-                    {hash: { absolute: 'true'}})
-            .then(function (rendered) {
-                should.exist(rendered);
-                rendered.should.equal('http://testurl.com/slug/');
-            });
+                    {hash: { absolute: 'true'}}
+                );
+
+            should.exist(rendered);
+            rendered.should.equal('http://testurl.com/slug/');
+
+            configStub.restore();
         });
 
         it('should return empty string if not a post', function () {
-            helpers.url.call({markdown: "ff", title: "title", slug: "slug"}).then(function (rendered) {
-                rendered.should.equal('');
-            });
-            helpers.url.call({html: 'content', title: "title", slug: "slug"}).then(function (rendered) {
-                rendered.should.equal('');
-            });
-            helpers.url.call({html: 'content', markdown: "ff", slug: "slug"}).then(function (rendered) {
-                rendered.should.equal('');
-            });
-            helpers.url.call({html: 'content', markdown: "ff", title: "title"}).then(function (rendered) {
-                rendered.should.equal('');
-            });
+            helpers.url.call({markdown: "ff", title: "title", slug: "slug"}).should.equal('');
+            helpers.url.call({html: 'content', title: "title", slug: "slug"}).should.equal('');
+            helpers.url.call({html: 'content', markdown: "ff", slug: "slug"}).should.equal('');
+            helpers.url.call({html: 'content', markdown: "ff", title: "title"}).should.equal('');
         });
     });
 
@@ -371,80 +330,101 @@ describe('Core Helpers', function () {
             should.exist(handlebars.helpers.pagination);
         });
 
-        it('can render single page with no pagination necessary', function () {
-            var rendered = helpers.pagination.call({pagination: {page: 1, prev: undefined, next: undefined, limit: 15, total: 8, pages: 1}});
-            should.exist(rendered);
-            // strip out carriage returns and compare.
-            rendered.string.should.match(paginationRegex);
-            rendered.string.should.match(pageRegex);
-            rendered.string.should.match(/Page 1 of 1/);
-            rendered.string.should.not.match(newerRegex);
-            rendered.string.should.not.match(olderRegex);
+        it('can render single page with no pagination necessary', function (done) {
+            var rendered;
+            helpers.loadCoreHelpers(ghost).then(function () {
+                rendered = helpers.pagination.call({pagination: {page: 1, prev: undefined, next: undefined, limit: 15, total: 8, pages: 1}});
+                should.exist(rendered);
+                // strip out carriage returns and compare.
+                rendered.string.should.match(paginationRegex);
+                rendered.string.should.match(pageRegex);
+                rendered.string.should.match(/Page 1 of 1/);
+                rendered.string.should.not.match(newerRegex);
+                rendered.string.should.not.match(olderRegex);
+                done();
+            }).then(null, done);
         });
 
-        it('can render first page of many with older posts link', function () {
-            var rendered = helpers.pagination.call({pagination: {page: 1, prev: undefined, next: 2, limit: 15, total: 8, pages: 3}});
-            should.exist(rendered);
+        it('can render first page of many with older posts link', function (done) {
+            var rendered;
+            helpers.loadCoreHelpers(ghost).then(function () {
+                rendered = helpers.pagination.call({pagination: {page: 1, prev: undefined, next: 2, limit: 15, total: 8, pages: 3}});
+                should.exist(rendered);
 
-            rendered.string.should.match(paginationRegex);
-            rendered.string.should.match(pageRegex);
-            rendered.string.should.match(olderRegex);
-            rendered.string.should.match(/Page 1 of 3/);
-            rendered.string.should.not.match(newerRegex);
+                rendered.string.should.match(paginationRegex);
+                rendered.string.should.match(pageRegex);
+                rendered.string.should.match(olderRegex);
+                rendered.string.should.match(/Page 1 of 3/);
+                rendered.string.should.not.match(newerRegex);
+                done();
+            }).then(null, done);
         });
 
-        it('can render middle pages of many with older and newer posts link', function () {
-            var rendered = helpers.pagination.call({pagination: {page: 2, prev: 1, next: 3, limit: 15, total: 8, pages: 3}});
-            should.exist(rendered);
+        it('can render middle pages of many with older and newer posts link', function (done) {
+            var rendered;
+            helpers.loadCoreHelpers(ghost).then(function () {
+                rendered = helpers.pagination.call({pagination: {page: 2, prev: 1, next: 3, limit: 15, total: 8, pages: 3}});
+                should.exist(rendered);
 
-            rendered.string.should.match(paginationRegex);
-            rendered.string.should.match(pageRegex);
-            rendered.string.should.match(olderRegex);
-            rendered.string.should.match(newerRegex);
-            rendered.string.should.match(/Page 2 of 3/);
+                rendered.string.should.match(paginationRegex);
+                rendered.string.should.match(pageRegex);
+                rendered.string.should.match(olderRegex);
+                rendered.string.should.match(newerRegex);
+                rendered.string.should.match(/Page 2 of 3/);
+
+                done();
+            }).then(null, done);
         });
 
-        it('can render last page of many with newer posts link', function () {
-            var rendered = helpers.pagination.call({pagination: {page: 3, prev: 2, next: undefined, limit: 15, total: 8, pages: 3}});
-            should.exist(rendered);
+        it('can render last page of many with newer posts link', function (done) {
+            var rendered;
+            helpers.loadCoreHelpers(ghost).then(function () {
+                rendered = helpers.pagination.call({pagination: {page: 3, prev: 2, next: undefined, limit: 15, total: 8, pages: 3}});
+                should.exist(rendered);
 
-            rendered.string.should.match(paginationRegex);
-            rendered.string.should.match(pageRegex);
-            rendered.string.should.match(newerRegex);
-            rendered.string.should.match(/Page 3 of 3/);
-            rendered.string.should.not.match(olderRegex);
+                rendered.string.should.match(paginationRegex);
+                rendered.string.should.match(pageRegex);
+                rendered.string.should.match(newerRegex);
+                rendered.string.should.match(/Page 3 of 3/);
+                rendered.string.should.not.match(olderRegex);
+
+                done();
+            }).then(null, done);
         });
 
-        it('validates values', function () {
-
-            var runErrorTest = function (data) {
-                return function () {
-                    helpers.pagination.call(data);
+        it('validates values', function (done) {
+            helpers.loadCoreHelpers(ghost).then(function () {
+                var runErrorTest = function (data) {
+                    return function () {
+                        helpers.pagination.call(data);
+                    };
                 };
-            };
 
-            runErrorTest({pagination: {page: 3, prev: true, next: undefined, limit: 15, total: 8, pages: 3}})
-                .should.throwError('Invalid value, Next/Prev must be a number');
-            runErrorTest({pagination: {page: 3, prev: 2, next: true, limit: 15, total: 8, pages: 3}})
-                .should.throwError('Invalid value, Next/Prev must be a number');
+                runErrorTest({pagination: {page: 3, prev: true, next: undefined, limit: 15, total: 8, pages: 3}})
+                    .should.throwError('Invalid value, Next/Prev must be a number');
+                runErrorTest({pagination: {page: 3, prev: 2, next: true, limit: 15, total: 8, pages: 3}})
+                    .should.throwError('Invalid value, Next/Prev must be a number');
 
-            runErrorTest({pagination: {limit: 15, total: 8, pages: 3}})
-                .should.throwError('All values must be defined for page, pages, limit and total');
-            runErrorTest({pagination: {page: 3, total: 8, pages: 3}})
-                .should.throwError('All values must be defined for page, pages, limit and total');
-            runErrorTest({pagination: {page: 3, limit: 15, pages: 3}})
-                .should.throwError('All values must be defined for page, pages, limit and total');
-            runErrorTest({pagination: {page: 3, limit: 15, total: 8}})
-                .should.throwError('All values must be defined for page, pages, limit and total');
+                runErrorTest({pagination: {limit: 15, total: 8, pages: 3}})
+                    .should.throwError('All values must be defined for page, pages, limit and total');
+                runErrorTest({pagination: {page: 3, total: 8, pages: 3}})
+                    .should.throwError('All values must be defined for page, pages, limit and total');
+                runErrorTest({pagination: {page: 3, limit: 15, pages: 3}})
+                    .should.throwError('All values must be defined for page, pages, limit and total');
+                runErrorTest({pagination: {page: 3, limit: 15, total: 8}})
+                    .should.throwError('All values must be defined for page, pages, limit and total');
 
-            runErrorTest({pagination: {page: null, limit: 15, total: 8, pages: 3}})
-                .should.throwError('Invalid value, check page, pages, limit and total are numbers');
-            runErrorTest({pagination: {page: 1, limit: null, total: 8, pages: 3}})
-                .should.throwError('Invalid value, check page, pages, limit and total are numbers');
-            runErrorTest({pagination: {page: 1, limit: 15, total: null, pages: 3}})
-                .should.throwError('Invalid value, check page, pages, limit and total are numbers');
-            runErrorTest({pagination: {page: 1, limit: 15, total: 8, pages: null}})
-                .should.throwError('Invalid value, check page, pages, limit and total are numbers');
+                runErrorTest({pagination: {page: null, limit: 15, total: 8, pages: 3}})
+                    .should.throwError('Invalid value, check page, pages, limit and total are numbers');
+                runErrorTest({pagination: {page: 1, limit: null, total: 8, pages: 3}})
+                    .should.throwError('Invalid value, check page, pages, limit and total are numbers');
+                runErrorTest({pagination: {page: 1, limit: 15, total: null, pages: 3}})
+                    .should.throwError('Invalid value, check page, pages, limit and total are numbers');
+                runErrorTest({pagination: {page: 1, limit: 15, total: 8, pages: null}})
+                    .should.throwError('Invalid value, check page, pages, limit and total are numbers');
+
+                done();
+            }).then(null, done);
         });
     });
 
@@ -578,4 +558,28 @@ describe('Core Helpers', function () {
 
     });
 
+    describe("has_tag helper", function () {
+        var tags = [{name: 'haunted'}, {name: 'ghost'}];
+
+        it('has loaded has_tag helper', function () {
+            should.exist(handlebars.helpers.has_tag);
+        });
+
+        it('can call function if tag is found', function () {
+            helpers.has_tag.call({tags: tags}, 'haunted', {
+                fn: function (tags) {
+                    should.exist(tags);
+                }
+            });
+        });
+
+        it('can call inverse function if tag is not found', function () {
+            helpers.has_tag.call({tags: tags}, 'undefined', {
+                inverse: function (tags) {
+                    should.exist(tags);
+                }
+            });
+        });
+
+    });
 });

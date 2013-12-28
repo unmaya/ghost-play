@@ -1333,6 +1333,7 @@ main {
 
     .image-url,
     .image-upload {
+        @include icon($i-link, 12px);
         line-height: 12px;
         padding: 10px;
         display: block;
@@ -1341,21 +1342,7 @@ main {
         left: 0;
         color: $brown;
         text-decoration: none;
-        @include user-select(none);
-
-        &:hover {
-          cursor: pointer;
-        }
     }
-
-    .image-webcam {
-      @include icon($i-camera, 12px);
-    }
-
-    .image-url {
-      @include icon($i-link, 12px);
-    }
-
     .image-upload {
       @include icon($i-image, 12px);
     }
@@ -1371,7 +1358,17 @@ main {
       margin: 0 0 0 10px;
     }
 
-
+    .image-webcam {
+        @include icon($i-camera, 12px);
+        line-height: 12px;
+        padding: 10px;
+        display: block;
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        color: $brown;
+        text-decoration: none;
+    }
 
     input {
         &.main{
@@ -1678,3 +1675,11 @@ main {
     }
 
 }
+
+.status-draft {
+    color: $red;
+}
+.status-scheduled {
+    color: $orange;
+}
+

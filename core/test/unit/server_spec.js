@@ -4,7 +4,10 @@ var net             = require('net'),
     should          = require('should'),
     request         = require('request'),
     server          = require('../../server'),
-    config          = require('../../../config');
+    Ghost           = require('../../ghost'),
+    config          = require('../../../config'),
+
+    ghost           = new Ghost();
 
 describe('Server', function () {
     var port = config.testing.server.port,

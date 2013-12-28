@@ -286,13 +286,14 @@ img {
    ========================================================================== */
 /*
 
+    0.  Includes
     1.  Basics
     2.  Default
     3.  Index
     4.  Pagination
     5.  Post
-    6.  Footer
-    7.  Icons etc
+    6.  Media Query Tablet
+    7.  Media Query Phone
 
  */
 /* ==========================================================================
@@ -870,7 +871,7 @@ img {
 }
 
 /* ==========================================================================
-   6. Footer - The bottom of every page
+   8. Footer - The bottom of every page
    ========================================================================== */
 .site-footer {
   background: #F7FAFB;
@@ -943,8 +944,9 @@ img {
 }
 
 /* ==========================================================================
-   7. Icons, Nav and Extras
+   1. Icons - Sets up the icon font and respective classes
    ========================================================================== */
+/* Import the font file with the icons in it */
 @font-face {
   font-family: 'icons';
   src: url("../fonts/icons.eot");
@@ -952,6 +954,7 @@ img {
   font-weight: normal;
   font-style: normal;
 }
+/* Apply these base styles to all icons */
 .icon-ghost, .icon-feed, .icon-twitter, .icon-google-plus, .icon-facebook {
   font-family: 'icons';
   speak: none;
@@ -964,6 +967,8 @@ img {
   text-decoration: none;
 }
 
+/* Each icon is created by inserting the corret character into the
+   content of the :before pseudo element. Like a boss. */
 .icon-ghost:before {
   content: "\e000";
 }
@@ -985,58 +990,39 @@ img {
   content: "\e004";
 }
 
-#header-nav {
-  display: none;
-  width: 100%;
-  position: fixed;
-  top: -5rem;
-  height: 3.6rem;
-  z-index: 100;
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.15);
-  background: rgba(255, 255, 255, 0.95);
-  /*box-shadow: 0 0px 30px 0 rgba(0, 0, 0, 0.5);*/
-  /*background: -webkit-linear-gradient(top, rgba(35, 83, 138, 0.9) 0%, rgba(52, 130, 173, 0.9) 100%);*/
-  /*background: linear-gradient(to bottom, rgba(35, 83, 138, 0.9) 0%, rgba(52, 130, 173, 0.9) 100%);*/
+/* ==========================================================================
+   6. Media Queries - Smaller than 640px
+   ========================================================================== */
+@media only screen and (max-width: 640px) {
+  /*
+  	body {
+  		font-size: 1.8em;
+  		line-height: 1.6em;
+  	}
+  */
 }
-
-#header-nav.displayed {
-  display: block;
+/* ==========================================================================
+   7. Media Queries - Smaller than 480px
+   ========================================================================== */
+@media only screen and (max-width: 480px) {
+  /*
+  	body {
+  		font-size: 1.6em;
+  		line-height: 1.6em;
+  	}
+  */
 }
-
-#header-nav .heading {
-  font-size: 2rem;
-  line-height: 3.6rem;
-  font-weight: 300;
-  margin: 0;
-  text-transform: uppercase;
-  padding: 0 0 0 15px;
+/* ==========================================================================
+   7. Media Queries - Smaller than 320px
+   ========================================================================== */
+@media only screen and (max-width: 320px) {
+  /*
+  	body {
+  		font-size: 1.4em;
+  		line-height: 1.6em;
+  	}
+  */
 }
-
-.heading a:link,
-.heading a:visited {
-  text-decoration: none;
-}
-
-#header-nav #scroll-to-top {
-  position: absolute;
-  top: 0;
-  right: 0;
-  text-decoration: none;
-}
-
-#header-nav #scroll-to-top:after {
-  content: '\2630';
-  color: #bbb;
-  font-weight: normal;
-  display: inline-block;
-  text-decoration: inherit;
-  width: 32px;
-  font-size: 2rem;
-  line-height: 3.8rem;
-  margin-right: 15px;
-  text-align: right;
-}
-
 /* Make clicks pass-through */
 #nprogress {
   pointer-events: none;

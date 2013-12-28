@@ -8,10 +8,10 @@ var _       = require('underscore'),
     path    = require('path'),
     when    = require('when'),
     errors  = require('../errorHandling'),
-    config  = require('../config'),
     baseStore   = require('./base'),
 
-    localFileStore;
+    localFileStore,
+    localDir = 'content/images';
 
 localFileStore = _.extend(baseStore, {
     // ### Save
@@ -20,25 +20,24 @@ localFileStore = _.extend(baseStore, {
     // - returns a promise which ultimately returns the full url to the uploaded image
     'save': function (image) {
         var saved = when.defer(),
-            targetDir = this.getTargetDir(config.paths().imagesRelPath),
-            targetFilename;
+            targetDir = this.getTargetDir(localDir);
 
         this.getUniqueFileName(this, image, targetDir).then(function (filename) {
-            targetFilename = filename;
-            return nodefn.call(fs.mkdirs, targetDir);
-        }).then(function () {
-            return nodefn.call(fs.copy, image.path, targetFilename);
-        }).then(function () {
-            return nodefn.call(fs.unlink, image.path).otherwise(errors.logError);
-        }).then(function () {
-            // The src for the image must be in URI format, not a file system path, which in Windows uses \
-            // For local file system storage can use relative path so add a slash
-            var fullUrl = (config.paths().webroot + '/' + targetFilename).replace(new RegExp('\\' + path.sep, 'g'), '/');
-            return saved.resolve(fullUrl);
-        }).otherwise(function (e) {
-            errors.logError(e);
-            return saved.reject(e);
-        });
+            nodefn.call(fs.mkdirs, targetDir).then(function () {
+                return nodefn.call(fs.copy, image.path, filename);
+            }).then(function () {
+                // we should remove the temporary image
+                return nodefn.call(fs.unlink, image.path).otherwise(errors.logError);
+            }).then(function () {
+                // The src for the image must be in URI format, not a file system path, which in Windows uses \
+                // For local file system storage can use relative path so add a slash
+                var fullUrl = ('/' + filename).replace(new RegExp('\\' + path.sep, 'g'), '/');
+                return saved.resolve(fullUrl);
+            }).otherwise(function (e) {
+                errors.logError(e);
+                return saved.reject(e);
+            });
+        }).otherwise(errors.logError);
 
         return saved.promise;
     },
@@ -56,7 +55,7 @@ localFileStore = _.extend(baseStore, {
 
     // middleware for serving the files
     'serve': function () {
-        return express['static'](config.paths().imagesPath);
+        return express['static'](path.join(__dirname, '/../../../', localDir));
     }
 });
 

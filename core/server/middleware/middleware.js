@@ -4,20 +4,15 @@
 
 var _           = require('underscore'),
     express     = require('express'),
-    busboy      = require('./ghost-busboy'),
+    Ghost       = require('../../ghost'),
     config      = require('../config'),
     path        = require('path'),
-    api         = require('../api'),
-    expressServer;
+    ghost       = new Ghost();
 
 function isBlackListedFileType(file) {
     var blackListedFileTypes = ['.hbs', '.md', '.json'],
         ext = path.extname(file);
     return _.contains(blackListedFileTypes, ext);
-}
-
-function cacheServer(server) {
-    expressServer = server;
 }
 
 var middleware = {
@@ -28,26 +23,26 @@ var middleware = {
     auth: function (req, res, next) {
         if (!req.session.user) {
             var reqPath = req.path.replace(/^\/ghost\/?/gi, ''),
+                root = ghost.blogGlobals().path === '/' ? '' : ghost.blogGlobals().path,
                 redirect = '',
                 msg;
 
-            return api.notifications.browse().then(function (notifications) {
-                if (reqPath !== '') {
-                    msg = {
-                        type: 'error',
-                        message: 'Please Sign In',
-                        status: 'passive',
-                        id: 'failedauth'
-                    };
-                    // let's only add the notification once
-                    if (!_.contains(_.pluck(notifications, 'id'), 'failedauth')) {
-                        api.notifications.add(msg);
-                    }
-                    redirect = '?r=' + encodeURIComponent(reqPath);
+            if (reqPath !== '') {
+                msg = {
+                    type: 'error',
+                    message: 'Please Sign In',
+                    status: 'passive',
+                    id: 'failedauth'
+                };
+                // let's only add the notification once
+                if (!_.contains(_.pluck(ghost.notifications, 'id'), 'failedauth')) {
+                    ghost.notifications.push(msg);
                 }
-                return res.redirect(config.paths().webroot + '/ghost/signin/' + redirect);
-            });
+                redirect = '?r=' + encodeURIComponent(reqPath);
+            }
+            return res.redirect(root + '/ghost/signin/' + redirect);
         }
+
         next();
     },
 
@@ -66,8 +61,10 @@ var middleware = {
     // Check if we're logged in, and if so, redirect people back to dashboard
     // Login and signup forms in particular
     redirectToDashboard: function (req, res, next) {
+        var root = ghost.blogGlobals().path === '/' ? '' : ghost.blogGlobals().path;
+
         if (req.session.user) {
-            return res.redirect(config.paths().webroot + '/ghost/');
+            return res.redirect(root + '/ghost/');
         }
 
         next();
@@ -79,14 +76,10 @@ var middleware = {
     // otherwise they'd appear one too many times
     cleanNotifications: function (req, res, next) {
         /*jslint unparam:true*/
-        api.notifications.browse().then(function (notifications) {
-            _.each(notifications, function (notification) {
-                if (notification.status === 'passive') {
-                    api.notifications.destroy(notification);
-                }
-            });
-            next();
+        ghost.notifications = _.reject(ghost.notifications, function (notification) {
+            return notification.status === 'passive';
         });
+        next();
     },
 
     // ### DisableCachedResult Middleware
@@ -106,8 +99,7 @@ var middleware = {
     // From https://github.com/senchalabs/connect/issues/676#issuecomment-9569658
     whenEnabled: function (setting, fn) {
         return function settingEnabled(req, res, next) {
-            // Set from server/middleware/index.js for now
-            if (expressServer.enabled(setting)) {
+            if (ghost.server.enabled(setting)) {
                 fn(req, res, next);
             } else {
                 next();
@@ -127,9 +119,7 @@ var middleware = {
 
     // to allow unit testing
     forwardToExpressStatic: function (req, res, next) {
-        api.settings.read('activeTheme').then(function (activeTheme) {
-            express['static'](path.join(config.paths().themePath, activeTheme.value))(req, res, next);
-        });
+        return express['static'](config.paths().activeTheme)(req, res, next);
     },
 
     conditionalCSRF: function (req, res, next) {
@@ -140,10 +130,7 @@ var middleware = {
             return;
         }
         next();
-    },
-
-    busboy: busboy
+    }
 };
 
 module.exports = middleware;
-module.exports.cacheServer = cacheServer;

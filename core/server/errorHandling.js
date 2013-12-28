@@ -1,14 +1,16 @@
 /*jslint regexp: true */
-var _           = require('underscore'),
-    colors      = require('colors'),
-    fs          = require('fs'),
-    configPaths = require('./config/paths'),
-    path        = require('path'),
+var _      = require('underscore'),
+    colors = require('colors'),
+    fs     = require('fs'),
+    path   = require('path'),
     errors,
 
     // Paths for views
-    defaultErrorTemplatePath = path.resolve(configPaths().adminViews, 'user-error.hbs'),
-    userErrorTemplatePath    = path.resolve(configPaths().themePath, 'error.hbs'),
+    appRoot                  = path.resolve(__dirname, '..', '..'),
+    themePath                = path.resolve(appRoot, 'content', 'themes'),
+    adminTemplatePath        = path.resolve(appRoot, 'core', 'server', 'views'),
+    defaultErrorTemplatePath = path.resolve(adminTemplatePath, 'user-error.hbs'),
+    userErrorTemplatePath    = path.resolve(themePath, 'error.hbs'),
     userErrorTemplateExists;
 
 /**
@@ -16,7 +18,7 @@ var _           = require('underscore'),
  */
 errors = {
     updateActiveTheme: function (activeTheme) {
-        userErrorTemplatePath = path.resolve(configPaths().themePath, activeTheme, 'error.hbs');
+        userErrorTemplatePath = path.resolve(themePath, activeTheme, 'error.hbs');
         userErrorTemplateExists = undefined;
     },
 

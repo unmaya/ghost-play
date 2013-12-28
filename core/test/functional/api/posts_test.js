@@ -4,7 +4,7 @@ var testUtils = require('../../utils'),
     _ = require('underscore'),
     request = require('request');
 
-request = request.defaults({jar:true});
+request = request.defaults({jar:true})
 
 describe('Post API', function () {
 
@@ -40,9 +40,7 @@ describe('Post API', function () {
             }, done);
     });
 
-    // ## Browse
-
-    it('retrieves all published posts only by default', function (done) {
+    it('can retrieve all posts', function (done) {
         request.get(testUtils.API.getApiURL('posts/'), function (error, response, body) {
             response.should.have.status(200);
             should.not.exist(response.headers['x-cache-invalidate']);
@@ -56,66 +54,6 @@ describe('Post API', function () {
         });
     });
 
-    it('can retrieve all published posts and pages', function (done) {
-        request.get(testUtils.API.getApiURL('posts/?staticPages=all'), function (error, response, body) {
-            response.should.have.status(200);
-            should.not.exist(response.headers['x-cache-invalidate']);
-            response.should.be.json;
-            var jsonResponse = JSON.parse(body);
-            jsonResponse.posts.should.exist;
-            testUtils.API.checkResponse(jsonResponse, 'posts');
-            jsonResponse.posts.should.have.length(6);
-            testUtils.API.checkResponse(jsonResponse.posts[0], 'post');
-            done();
-        });
-    });
-
-    // Test bits of the API we don't use in the app yet to ensure the API behaves properly
-
-    it('can retrieve all status posts and pages', function (done) {
-        request.get(testUtils.API.getApiURL('posts/?staticPages=all&status=all'), function (error, response, body) {
-            response.should.have.status(200);
-            should.not.exist(response.headers['x-cache-invalidate']);
-            response.should.be.json;
-            var jsonResponse = JSON.parse(body);
-            jsonResponse.posts.should.exist;
-            testUtils.API.checkResponse(jsonResponse, 'posts');
-            jsonResponse.posts.should.have.length(8);
-            testUtils.API.checkResponse(jsonResponse.posts[0], 'post');
-            done();
-        });
-    });
-
-    it('can retrieve just published pages', function (done) {
-        request.get(testUtils.API.getApiURL('posts/?staticPages=true'), function (error, response, body) {
-            response.should.have.status(200);
-            should.not.exist(response.headers['x-cache-invalidate']);
-            response.should.be.json;
-            var jsonResponse = JSON.parse(body);
-            jsonResponse.posts.should.exist;
-            testUtils.API.checkResponse(jsonResponse, 'posts');
-            jsonResponse.posts.should.have.length(1);
-            testUtils.API.checkResponse(jsonResponse.posts[0], 'post');
-            done();
-        });
-    });
-
-    it('can retrieve just draft posts', function (done) {
-        request.get(testUtils.API.getApiURL('posts/?status=draft'), function (error, response, body) {
-            response.should.have.status(200);
-            should.not.exist(response.headers['x-cache-invalidate']);
-            response.should.be.json;
-            var jsonResponse = JSON.parse(body);
-            jsonResponse.posts.should.exist;
-            testUtils.API.checkResponse(jsonResponse, 'posts');
-            jsonResponse.posts.should.have.length(1);
-            testUtils.API.checkResponse(jsonResponse.posts[0], 'post');
-            done();
-        });
-    });
-
-    // ## Read
-
     it('can retrieve a post', function (done) {
         request.get(testUtils.API.getApiURL('posts/1/'), function (error, response, body) {
             response.should.have.status(200);
@@ -124,61 +62,9 @@ describe('Post API', function () {
             var jsonResponse = JSON.parse(body);
             jsonResponse.should.exist;
             testUtils.API.checkResponse(jsonResponse, 'post');
-            jsonResponse.page.should.eql(0);
             done();
         });
     });
-
-    it('can retrieve a static page', function (done) {
-        request.get(testUtils.API.getApiURL('posts/7/'), function (error, response, body) {
-            response.should.have.status(200);
-            should.not.exist(response.headers['x-cache-invalidate']);
-            response.should.be.json;
-            var jsonResponse = JSON.parse(body);
-            jsonResponse.should.exist;
-            testUtils.API.checkResponse(jsonResponse, 'post');
-            jsonResponse.page.should.eql(1);
-            done();
-        });
-    });
-
-    it('can\'t retrieve non existent post', function (done) {
-        request.get(testUtils.API.getApiURL('posts/99/'), function (error, response, body) {
-            response.should.have.status(404);
-            should.not.exist(response.headers['x-cache-invalidate']);
-            response.should.be.json;
-            var jsonResponse = JSON.parse(body);
-            jsonResponse.should.exist;
-            testUtils.API.checkResponseValue(jsonResponse, ['error']);
-            done();
-        });
-    });
-
-    it('can\'t retrieve a draft post', function (done) {
-        request.get(testUtils.API.getApiURL('posts/5/'), function (error, response, body) {
-            response.should.have.status(404);
-            should.not.exist(response.headers['x-cache-invalidate']);
-            response.should.be.json;
-            var jsonResponse = JSON.parse(body);
-            jsonResponse.should.exist;
-            testUtils.API.checkResponseValue(jsonResponse, ['error']);
-            done();
-        });
-    });
-
-    it('can\'t retrieve a draft page', function (done) {
-        request.get(testUtils.API.getApiURL('posts/8/'), function (error, response, body) {
-            response.should.have.status(404);
-            should.not.exist(response.headers['x-cache-invalidate']);
-            response.should.be.json;
-            var jsonResponse = JSON.parse(body);
-            jsonResponse.should.exist;
-            testUtils.API.checkResponseValue(jsonResponse, ['error']);
-            done();
-        });
-    });
-
-    // ## Add
 
     it('can create a new draft, publish post, update post', function (done) {
         var newTitle = 'My Post',
@@ -221,7 +107,18 @@ describe('Post API', function () {
         });
     });
 
-    // ## edit
+
+    it('can\'t retrieve non existent post', function (done) {
+        request.get(testUtils.API.getApiURL('posts/99/'), function (error, response, body) {
+            response.should.have.status(404);
+            should.not.exist(response.headers['x-cache-invalidate']);
+            response.should.be.json;
+            var jsonResponse = JSON.parse(body);
+            jsonResponse.should.exist;
+            testUtils.API.checkResponseValue(jsonResponse, ['error']);
+            done();
+        });
+    });
 
     it('can edit a post', function (done) {
         request.get(testUtils.API.getApiURL('posts/1/'), function (error, response, body) {
@@ -244,8 +141,6 @@ describe('Post API', function () {
             });
         });
     });
-
-    // ## delete
 
     it('can\'t edit non existent post', function (done) {
         request.get(testUtils.API.getApiURL('posts/1/'), function (error, response, body) {
@@ -321,4 +216,6 @@ describe('Post API', function () {
             });
         });
     });
+
+
 });

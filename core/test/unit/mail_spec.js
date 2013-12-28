@@ -8,6 +8,7 @@ var testUtils = require('../utils'),
     cp = require('child_process'),
 
     // Stuff we are testing
+    Ghost = require('../../ghost'),
     defaultConfig = require('../../../config'),
     mailer = require('../../server/mail'),
     SMTP,
@@ -16,6 +17,7 @@ var testUtils = require('../utils'),
     fakeSettings,
     fakeSendmail,
     sandbox = sinon.sandbox.create(),
+    ghost,
     config;
 
 // Mock SMTP config
@@ -49,7 +51,13 @@ describe("Mail", function () {
         };
         fakeSendmail = '/fake/bin/sendmail';
 
+        ghost = new Ghost();
+
         config = sinon.stub().returns(fakeConfig);
+
+        sandbox.stub(ghost, "settings", function () {
+            return fakeSettings;
+        });
 
         sandbox.stub(mailer, "isWindows", function () {
             return false;
@@ -72,8 +80,8 @@ describe("Mail", function () {
     });
 
     it('should setup SMTP transport on initialization', function (done) {
-        fakeConfig[process.env.NODE_ENV].mail = SMTP;
-        mailer.init().then(function () {
+        fakeConfig.mail = SMTP;
+        mailer.init(ghost, config).then(function () {
             mailer.should.have.property('transport');
             mailer.transport.transportType.should.eql('SMTP');
             mailer.transport.sendMail.should.be.a.function;
@@ -82,8 +90,8 @@ describe("Mail", function () {
     });
 
     it('should setup sendmail transport on initialization', function (done) {
-        fakeConfig[process.env.NODE_ENV].mail = SENDMAIL;
-        mailer.init().then(function () {
+        fakeConfig.mail = SENDMAIL;
+        mailer.init(ghost, config).then(function () {
             mailer.should.have.property('transport');
             mailer.transport.transportType.should.eql('SENDMAIL');
             mailer.transport.sendMail.should.be.a.function;
@@ -92,8 +100,8 @@ describe("Mail", function () {
     });
 
     it('should fallback to sendmail if no config set', function (done) {
-        fakeConfig[process.env.NODE_ENV].mail = null;
-        mailer.init().then(function () {
+        fakeConfig.mail = null;
+        mailer.init(ghost, config).then(function () {
             mailer.should.have.property('transport');
             mailer.transport.transportType.should.eql('SENDMAIL');
             mailer.transport.options.path.should.eql(fakeSendmail);
@@ -102,8 +110,8 @@ describe("Mail", function () {
     });
 
     it('should fallback to sendmail if config is empty', function (done) {
-        fakeConfig[process.env.NODE_ENV].mail = {};
-        mailer.init().then(function () {
+        fakeConfig.mail = {};
+        mailer.init(ghost, config).then(function () {
             mailer.should.have.property('transport');
             mailer.transport.transportType.should.eql('SENDMAIL');
             mailer.transport.options.path.should.eql(fakeSendmail);
@@ -112,23 +120,23 @@ describe("Mail", function () {
     });
 
     it('should disable transport if config is empty & sendmail not found', function (done) {
-        fakeConfig[process.env.NODE_ENV].mail = {};
+        fakeConfig.mail = {};
         mailer.detectSendmail.restore();
         sandbox.stub(mailer, "detectSendmail", when.reject);
-        mailer.init().then(function () {
+        mailer.init(ghost, config).then(function () {
             should.not.exist(mailer.transport);
             done();
         }).then(null, done);
     });
 
     it('should disable transport if config is empty & platform is win32', function (done) {
-        fakeConfig[process.env.NODE_ENV].mail = {};
+        fakeConfig.mail = {};
         mailer.detectSendmail.restore();
         mailer.isWindows.restore();
         sandbox.stub(mailer, 'isWindows', function () {
             return true;
         });
-        mailer.init().then(function () {
+        mailer.init(ghost, config).then(function () {
             should.not.exist(mailer.transport);
             done();
         }).then(null, done);
@@ -137,7 +145,7 @@ describe("Mail", function () {
     it('should fail to send messages when no transport is set', function (done) {
         mailer.detectSendmail.restore();
         sandbox.stub(mailer, "detectSendmail", when.reject);
-        mailer.init().then(function () {
+        mailer.init(ghost, config).then(function () {
             mailer.send().then(function () {
                 should.fail();
                 done();

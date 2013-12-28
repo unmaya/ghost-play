@@ -53,7 +53,7 @@
             e.currentTarget.select();
         },
 
-        editSlug: _.debounce(function (e) {
+        editSlug: function (e) {
             e.preventDefault();
             var self = this,
                 slug = self.model.get('slug'),
@@ -88,9 +88,9 @@
                     });
                 }
             });
-        }, 500),
+        },
 
-        editDate: _.debounce(function (e) {
+        editDate: function (e) {
             e.preventDefault();
             var self = this,
                 parseDateFormats = ['DD MMM YY HH:mm', 'DD MMM YYYY HH:mm', 'DD/MM/YY HH:mm', 'DD/MM/YYYY HH:mm', 'DD-MM-YY HH:mm', 'DD-MM-YYYY HH:mm'],
@@ -177,11 +177,11 @@
                 }
             });
 
-        }, 500),
+        },
 
-        toggleStaticPage: _.debounce(function (e) {
+        toggleStaticPage: function (e) {
             var pageEl = $(e.currentTarget),
-                page = pageEl.prop('checked');
+                page = this.model ? !this.model.get('page') : false;
 
             this.model.save({
                 page: page
@@ -204,7 +204,7 @@
                     });
                 }
             });
-        }, 500),
+        },
 
         deletePost: function (e) {
             e.preventDefault();

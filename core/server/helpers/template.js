@@ -1,27 +1,40 @@
 var templates     = {},
+    nodefn        = require('when/node/function'),
+    fs            = require('fs'),
     hbs           = require('express-hbs'),
-    errors        = require('../errorHandling');
+    errors        = require('../errorHandling'),
+    path          = require('path'),
+    when          = require('when'),
+    config        = require('../config');
 
 // ## Template utils
 
-// Execute a template helper
-// All template helpers are register as partial view.
-templates.execute = function (name, context) {
+// Compile a template for a handlebars helper
+templates.compileTemplate = function (templatePath) {
+    return nodefn.call(fs.readFile, templatePath).then(function (templateContents) {
+        return hbs.handlebars.compile(templateContents.toString());
+    }, errors.logAndThrowError);
+};
 
-    var partial = hbs.handlebars.partials[name];
+// Load a template for a handlebars helper
+templates.loadTemplate = function (name) {
+    var templateFileName = name + '.hbs',
+        // Check for theme specific version first
+        templatePath = path.join(config.paths().activeTheme, 'partials', templateFileName),
+        deferred = when.defer();
 
-    if (partial === undefined) {
-        errors.logAndThrowError('Template ' + name + ' not found.');
-        return;
-    }
+    // Can't use nodefn here because exists just returns one parameter, true or false
 
-    // If the partial view is not compiled, it compiles and saves in handlebars
-    if (typeof partial === 'string') {
-        partial = hbs.handlebars.compile(partial);
-        hbs.handlebars.partials[name] = partial;
-    }
+    fs.exists(templatePath, function (exists) {
+        if (!exists) {
+            // Fall back to helpers templates location
+            templatePath = path.join(config.paths().helperTemplates, templateFileName);
+        }
 
-    return new hbs.handlebars.SafeString(partial(context));
+        templates.compileTemplate(templatePath).then(deferred.resolve, deferred.reject);
+    });
+
+    return deferred.promise;
 };
 
 module.exports = templates;

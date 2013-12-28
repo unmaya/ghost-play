@@ -95,22 +95,14 @@
             }
         }
 
-        .featured .status {
+        .featured .date {
             @include icon($i-featured, 11px) {
-                margin-right: 10px;
-                vertical-align: 7%;
+                margin-right:12px;
+                vertical-align: 0;
             };
         }
 
-        .status .draft {
-            color: $red;
-        }
-        .status .scheduled {
-            color: $orange;
-        }
-
-
-      ol {
+        ol {
             list-style: none;
             padding:0;
             margin:0;
