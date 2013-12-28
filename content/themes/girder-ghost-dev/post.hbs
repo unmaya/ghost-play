@@ -36,7 +36,7 @@
             {{#if author}}
             <section itemprop="author" itemscope itemtype="http://schema.org/Person" class="author post-author-info">
                 {{#if author.image}}
-                <a href="http://{{author.website}}" class="post-author-avatar">
+                <a href="{{author.website}}" class="post-author-avatar">
                     <img itemprop="image" src="{{author.image}}" alt="{{author.name}}">
                 </a>
                 {{/if}}
@@ -45,7 +45,7 @@
 
                 <p itemprop="description" class="post-author-bio">
                     {{author.bio}} <br>
-                    <a href="http://{{author.website}}" rel="nofollow">{{author.website}}</a>
+                    <a href="{{author.website}}" rel="nofollow">{{author.website}}</a>
                 </p>
                 {{#if author.website}}
                     <p class="post-author-website">
