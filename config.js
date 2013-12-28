@@ -6,6 +6,7 @@ var path = require('path'),
 
 config = {
     production: {
+<<<<<<< HEAD
         url: 'http://ghost.fredmaya.com',
         // mail: {
         //     transport: 'sendgrid',
@@ -18,6 +19,20 @@ config = {
         //         }
         //     }
         // },
+=======
+        url: process.env.MY_URL,
+        mail: {
+            transport: 'sendgrid',
+            host: 'smtp.sendgrid.net',
+            options: {
+                service: 'Sendgrid',
+                auth: {
+                    user: process.env.SENDMAIL_USERNAME,
+                    pass: process.env.SENDMAIL_PASSWORD
+                }
+            }
+        },
+>>>>>>> ce62484... New settings for postgre DB
         database: {
             client: 'pg',
             connection: {
