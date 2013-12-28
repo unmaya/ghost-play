@@ -7,6 +7,7 @@ var path = require('path'),
 config = {
     production: {
 <<<<<<< HEAD
+<<<<<<< HEAD
         url: 'http://ghost.fredmaya.com',
         // mail: {
         //     transport: 'sendgrid',
@@ -21,16 +22,19 @@ config = {
         // },
 =======
         url: process.env.MY_URL,
+=======
+        url: 'http://sheltered-brushlands-8592.herokuapp.com',
+>>>>>>> 7f2e86d... index now forces production env
         mail: {
-            transport: 'sendgrid',
-            host: 'smtp.sendgrid.net',
-            options: {
-                service: 'Sendgrid',
-                auth: {
-                    user: process.env.SENDMAIL_USERNAME,
-                    pass: process.env.SENDMAIL_PASSWORD
-                }
-            }
+            // transport: 'sendgrid',
+            // host: 'smtp.sendgrid.net',
+            // options: {
+            //     service: 'Sendgrid',
+            //     auth: {
+            //         user: process.env.SENDMAIL_USERNAME,
+            //         pass: process.env.SENDMAIL_PASSWORD
+            //     }
+            // }
         },
 >>>>>>> ce62484... New settings for postgre DB
         database: {
