@@ -1,42 +1,57 @@
 {{!< default}}
 
-{{! The comment above "< default" means - insert everything in this file into
-    the {body} of the default.hbs template, which contains our header/footer. }}
+<main class="content row" role="main">
+        <article class="{{post_class}} single">
 
-<main class="content" role="main">
+    <div class="inner">
+            {{#post}}
 
-    <article class="{{post_class}}">
+            <header class="post-header">
+                <div class="post-meta">
+                    <time datetime="{{date published_at format="YYYY-MM-DD"}}" itemprop="datePublished">
+                      {{date published_at timeago="true"}}
+                    </time>
+                    {{#if tags}}
+                    //
+                    <strong class="post-meta-item">
+                      {{#foreach tags}}
+                        <span itemprop="{{#if @first}}articleSection{{else}}keywords{{/if}}">{{name}}</span>
+                      {{/foreach}}
+                    </strong>
+                    {{/if}}
+                </div>
 
-        {{! Each post has the blog logo at the top, with a link back to the home page }}
-        <header class="post-header">
-            <a id="blog-logo" href="{{@blog.url}}">
-                {{#if @blog.logo}}
-                    <img src="{{@blog.logo}}" alt="Blog Logo" />
-                {{else}}
-                    <span class="blog-title">{{@blog.title}}</span>
-                {{/if}}
-            </a>
-        </header>
+                <h1 class="post-title">{{{title}}}</h1>
+            </header>
 
-        {{! Everything inside the #post tags pulls data from the post }}
-        {{#post}}
+            <section class="post-content">
+                {{content}}
+            </section>
 
-        {{! Everything below outputs content of the the post which has been published }}
-        <span class="post-meta"><time datetime="{{date format="YYYY-MM-DD"}}">{{date format='DD MMM YYYY'}}</time> {{tags prefix="on " separator=" | "}}</span>
+            <section class="post-meta">
+                <time datetime="{{date format="YYYY-MM-DD"}}">{{date format='DD MMM YYYY'}}</time> {{#if tags}}on {{tags separator=" | "}}{{/if}}
+            </section>
 
-        <h1 class="post-title">{{{title}}}</h1>
-
-        <section class="post-content">
-            {{content}}
-        </section>
-
-        <footer class="post-footer">
-
+            <footer class="post-footer">
             {{#if author}}
-                <section class="author">
-                    <h4>{{author.name}}</h4>
-                    <p>{{author.bio}}</p>
-                </section>
+            <section itemprop="author" itemscope itemtype="http://schema.org/Person" class="author post-author-info">
+                {{#if author.image}}
+                <a href="http://{{author.website}}" class="post-author-avatar">
+                    <img itemprop="image" src="{{author.image}}" alt="{{author.name}}">
+                </a>
+                {{/if}}
+                <h4><a href="{{author.website}}" itemprop="url" class="post-author-name">
+                <span itemprop="name">{{author.name}}</span></a></h4>
+
+                <p itemprop="description" class="post-author-bio">
+                    {{author.bio}} <br>
+                    <a href="http://{{author.website}}" rel="nofollow">{{author.website}}</a>
+                </p>
+                {{#if author.website}}
+                    <p class="post-author-website">
+                    </p>
+                {{/if}}
+            </section>
             {{/if}}
 
             <section class="share">
@@ -50,15 +65,22 @@
                     <span class="hidden">Facebook</span>
                 </a>
                 <a class="icon-google-plus" href="https://plus.google.com/share?url={{url absolute="true"}}"
-                   onclick="window.open(this.href, 'google-plus-share', 'width=490,height=530');return false;">
+                    onclick="window.open(this.href, 'google-plus-share', 'width=490,height=530');return false;">
                     <span class="hidden">Google+</span>
                 </a>
             </section>
+            </footer>
 
-        </footer>
+            {{!-- Future additions...
+            <aside id="comments" class="post-comments">
+                <h2>Comments</h2>
+                <p><small>(Currently unavailable, coming soon!)</small></p>
+            </aside>
+            --}}
 
-        {{/post}}
+            {{/post}}
 
-    </article>
+    </div>
+        </article>
 
 </main>

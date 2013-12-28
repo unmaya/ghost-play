@@ -13,32 +13,58 @@
     <meta name="MobileOptimized" content="320" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    {{! Styles'n'Scripts }}
-    <link rel="stylesheet" type="text/css" href="{{asset "css/screen.css"}}" />
-    <link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Noto+Serif:400,700,400italic|Open+Sans:700,400" />
+		<script src="//use.edgefonts.net/source-sans-pro;pt-sans-narrow;lato:n1,n3,n9,i9.js"></script>
+		<link rel="stylesheet" type="text/css" href="/assets/css/site.css" />
+
+	<!--[if lt IE 9]>
+		<script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+	<![endif]-->
 
     {{! Ghost outputs important style and meta data with this tag }}
     {{ghost_head}}
 </head>
 <body class="{{body_class}}">
 
-    {{! Everything else gets inserted here }}
-    {{{body}}}
+<header id="site-head"{{#if @blog.cover}} class="cover"{{/if}}>
+	<div class="inner">
+		{{#if @blog.logo}}
+			<a class="js-ajax-link js-show-index" id="blog-logo" href="{{@blog.url}}"><img src="{{@blog.logo}}" alt="Blog Logo" /></a>
+		{{else}}
+			<a class="js-ajax-link js-show-index" id="blog-logo" href="{{@blog.url}}"><img src="assets/img/girder-logo-white.png" alt="Girder Ghost Logo" /></a>
+		{{/if}}
+			<h1 class="blog-title"><a class="js-ajax-link js-show-index" id="blog-logo-title" href="{{@blog.url}}">{{@blog.title}}</a></h1>
 
-    <footer class="site-footer">
-        <a class="subscribe icon-feed" href="{{@blog.url}}/rss/"><span class="tooltip">Subscribe!</span></a>
-        <div class="inner">
-             <section class="copyright">All content copyright <a href="/">{{@blog.title}}</a> &copy; {{date format="YYYY"}} &bull; All rights reserved.</section>
-             <section class="poweredby">Proudly published with <a class="icon-ghost" href="http://ghost.org">Ghost</a></section>
-        </div>
-    </footer>
+	</div>
+	{{#if @blog.cover}}
+		<div id="site-cover" style="background-image: url({{@blog.cover}})"></div>
+	{{else}}
+		<div id="site-cover" class="girder-ghost-cover"></div>
+	{{/if}}
+</header>
 
-    {{! Ghost outputs important scripts and data with this tag }}
-    {{ghost_foot}}
+<section id="wrapper" class="container">
+	<div id="ajax-container">
+		{{{body}}}
+	</div>
+</section>
 
-    {{! The main JavaScript file for Casper }}
-    <script type="text/javascript" src="{{asset "js/jquery.fitvids.js"}}"></script>
-    <script type="text/javascript" src="{{asset "js/index.js"}}"></script>
+<footer class="site-footer">
+	<a class="thetheme" href="#"><small>Ghost Theme</small></a>
+	<div class="inner">
+		<section class="copyright">All content by <a href="/">{{@blog.title}}</a> &copy; 2013 &bull; All rights reserved.</section>
+		<section class="poweredby"><small>Published with <a class="icon-ghost" href="http://ghost.org">Ghost</a></small></section>
+	</div>
+</footer>
+
+{{! Ghost outputs important scripts and data with this tag }}
+{{ghost_foot}}
+
+<!-- build:js /assets/js/site.min.js -->
+<script type="text/javascript" src="assets/js/libs/jquery.history.js"></script>
+<script type="text/javascript" src="assets/js/libs/nprogress.js"></script>
+<script type="text/javascript" src="assets/js/libs/prism.js"></script>
+<script type="text/javascript" src="assets/js/main.js"></script>
+<!-- endbuild -->
 
 </body>
 </html>
