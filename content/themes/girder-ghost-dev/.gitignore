@@ -18,10 +18,6 @@ node_modules
 *.iml
 projectFilesBackup
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 5a5ca62... default template
 .DS_Store
 
 Gruntfile.js
@@ -32,9 +28,3 @@ package.json
 /assets/_components
 /assets/_scss
 
-<<<<<<< HEAD
-=======
-.DS_Store
->>>>>>> 88a0749... fixing fatal error
-=======
->>>>>>> 5a5ca62... default template
